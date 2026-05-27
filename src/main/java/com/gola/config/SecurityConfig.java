@@ -59,7 +59,8 @@ public class SecurityConfig {
                 "http://127.0.0.1:5173",
                 golaProperties.getFrontendUrl(),
                 "http://localhost:3000",
-                "http://127.0.0.1:3000"
+                "http://127.0.0.1:3000",
+                "https://gola-way-ai-route.vercel.app"
         ));
         config.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
