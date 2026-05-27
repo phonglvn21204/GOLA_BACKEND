@@ -1,0 +1,13 @@
+﻿.gradle/
+build/
+*.class
+*.jar
+*.war
+out/
+.idea/
+*.iml
+.env
+*.log
+target/
+__pycache__/
+.DS_Store

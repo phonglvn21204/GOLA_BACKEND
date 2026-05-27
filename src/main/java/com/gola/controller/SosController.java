@@ -1,0 +1,34 @@
+package com.gola.controller;
+
+import com.gola.dto.common.ApiResponse;
+import com.gola.dto.safety.*;
+import com.gola.service.SosService;
+import com.gola.security.SecurityUtils;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
+import java.util.UUID;
+
+@RestController @RequestMapping("/sos")
+@RequiredArgsConstructor
+@Tag(name = "SOS Emergency", description = "Trigger, resolve, and monitor SOS events")
+public class SosController {
+    private final SosService sosService;
+
+    @PostMapping("/trigger")
+    @Operation(summary = "Trigger SOS emergency")
+    public ResponseEntity<ApiResponse<SosResponse>> trigger(@RequestBody SosTriggerRequest req) {
+        return ResponseEntity.ok(ApiResponse.ok("SOS triggered", sosService.triggerSos(SecurityUtils.getCurrentUserId(), req)));
+    }
+
+    @PostMapping("/{sosId}/resolve")
+    @Operation(summary = "Resolve SOS event")
+    public ResponseEntity<ApiResponse<Void>> resolve(@PathVariable UUID sosId, @RequestBody Map<String,String> body) {
+        sosService.resolveSos(sosId, SecurityUtils.getCurrentUserId(), body.get("reason"));
+        return ResponseEntity.ok(ApiResponse.ok("SOS resolved", null));
+    }
+}

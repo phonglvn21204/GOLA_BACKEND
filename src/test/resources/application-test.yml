@@ -1,0 +1,20 @@
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 5
+  jpa:
+    show-sql: false
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+
+gola:
+  jwt:
+    secret: test-secret-key-must-be-at-least-256-bits-long-for-hmac
+    access-token-expiry-ms: 900000
+    refresh-token-expiry-ms: 604800000
+
+logging:
+  level:
+    com.gola: WARN
+    org.springframework.security: WARN

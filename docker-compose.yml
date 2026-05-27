@@ -1,0 +1,58 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgis/postgis:16-3.4-alpine
+    container_name: gola-postgres
+    environment:
+      POSTGRES_DB: goladb
+      POSTGRES_USER: gola
+      POSTGRES_PASSWORD: gola123
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U gola -d goladb']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: gola-redis
+    command: redis-server --appendonly yes
+    ports:
+      - '6379:6379'
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: gola-backend
+    ports:
+      - '8080:8080'
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/goladb
+      DB_USERNAME: gola
+      DB_PASSWORD: gola123
+      REDIS_HOST: redis
+      PORT: 8080
+
+volumes:
+  pgdata:
+  redisdata:

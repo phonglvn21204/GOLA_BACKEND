@@ -1,0 +1,32 @@
+package com.gola.entity;
+
+import com.gola.entity.enums.QuestType;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import java.time.Instant;
+import java.util.UUID;
+
+@Entity @Table(name = "quests")
+@EntityListeners(AuditingEntityListener.class)
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class Quest {
+    @Id @GeneratedValue(strategy = GenerationType.UUID) private UUID id;
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(columnDefinition = "quest_type")
+    @Builder.Default
+    private QuestType type = QuestType.SOLO;
+    @Column(nullable = false) private String title;
+    private String description;
+    @Column(name = "reward_coins") private int rewardCoins;
+    @Column(name = "badge_id") private UUID badgeId;
+    @Column(name = "is_featured") private boolean isFeatured;
+    @Column(name = "is_active") @Builder.Default private boolean isActive = true;
+    @Column(name = "expires_at") private Instant expiresAt;
+    @CreatedDate @Column(name = "created_at", updatable = false) private Instant createdAt;
+}
