@@ -108,3 +108,10 @@ tasks.named('test') {
 tasks.withType(JavaCompile).configureEach {
     options.compilerArgs << '-Amapstruct.defaultComponentModel=spring'
 }
+
+bootJar {
+    enabled = true
+}
+jar {
+    enabled = false
+}
