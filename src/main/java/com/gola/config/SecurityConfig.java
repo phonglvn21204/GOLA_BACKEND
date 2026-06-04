@@ -40,7 +40,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
-                .requestMatchers(HttpMethod.POST, "/auth/register", "/auth/login",
+                .requestMatchers(HttpMethod.POST, "/auth/register", "/auth/login", "/auth/login/google",
                     "/auth/refresh", "/auth/forgot-password", "/auth/reset-password").permitAll()
                 .requestMatchers(HttpMethod.GET,  "/pricing/**", "/emergency/hotlines").permitAll()
                 .requestMatchers(HttpMethod.POST, "/webhooks/stripe").permitAll()

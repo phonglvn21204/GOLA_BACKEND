@@ -13,6 +13,7 @@ import com.gola.repository.ProfileRepository;
 import com.gola.repository.RefreshTokenRepository;
 import com.gola.repository.WalletRepository;
 import com.gola.repository.UserRoleRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -20,6 +21,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;
@@ -39,6 +46,8 @@ public class AuthService {
     private final JwtService             jwtService;
     private final GolaProperties         props;
     private final RedisTemplate<String, Object> redis;
+    private final ObjectMapper           objectMapper;
+    private final HttpClient             httpClient = HttpClient.newHttpClient();
 
     @Transactional
     public AuthResponse register(RegisterRequest req) {
@@ -69,6 +78,90 @@ public class AuthService {
         log.info("User logged in: {}", profile.getEmail());
         return buildAuthResponse(profile, role);
     }
+
+    @Transactional
+    public AuthResponse loginWithGoogle(GoogleLoginRequest req) {
+        var payload = verifyGoogleToken(req.getIdToken());
+        if (!payload.emailVerified()) {
+            throw GolaException.unauthorized("Google email is not verified");
+        }
+        var email = payload.email().toLowerCase();
+        var profile = profileRepo.findByEmail(email).orElseGet(() -> createGoogleProfile(payload));
+        if (profile.isDeleted()) throw GolaException.unauthorized("Account deactivated");
+        boolean updated = false;
+        if (!profile.isEmailVerified()) {
+            profile.setEmailVerifiedAt(Instant.now());
+            updated = true;
+        }
+        if (profile.getDisplayName() == null && payload.name() != null) {
+            profile.setDisplayName(payload.name());
+            updated = true;
+        }
+        if (profile.getAvatarUrl() == null && payload.picture() != null) {
+            profile.setAvatarUrl(payload.picture());
+            updated = true;
+        }
+        if (updated) {
+            profileRepo.save(profile);
+        }
+        var role = roleRepo.findByProfile_Id(profile.getId()).stream()
+            .map(UserRole::getRole).findFirst().orElse(AppRole.USER);
+        log.info("User logged in with Google: {}", profile.getEmail());
+        return buildAuthResponse(profile, role);
+    }
+
+    private Profile createGoogleProfile(GoogleTokenPayload payload) {
+        var profile = Profile.builder()
+            .id(UUID.randomUUID())
+            .email(payload.email().toLowerCase())
+            .displayName(payload.name())
+            .avatarUrl(payload.picture())
+            .emailVerifiedAt(Instant.now())
+            .build();
+        var userRole = UserRole.builder().profile(profile).role(AppRole.USER).build();
+        profile.getRoles().add(userRole);
+        profileRepo.saveAndFlush(profile);
+        walletRepo.save(Wallet.builder().userId(profile.getId()).golaCoins(0).build());
+        log.info("New Google user created: {}", profile.getEmail());
+        return profile;
+    }
+
+    private GoogleTokenPayload verifyGoogleToken(String idToken) {
+        try {
+            var uri = URI.create("https://oauth2.googleapis.com/tokeninfo?id_token=" + URLEncoder.encode(idToken, StandardCharsets.UTF_8));
+            var request = HttpRequest.newBuilder(uri)
+                .GET()
+                .header("Accept", "application/json")
+                .build();
+            var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                throw GolaException.unauthorized("Invalid Google ID token");
+            }
+            var node = objectMapper.readTree(response.body());
+            var email = node.path("email").asText(null);
+            if (email == null) {
+                throw GolaException.unauthorized("Google token missing email");
+            }
+            var emailVerified = "true".equalsIgnoreCase(node.path("email_verified").asText());
+            return new GoogleTokenPayload(
+                email,
+                node.path("name").asText(null),
+                node.path("picture").asText(null),
+                emailVerified,
+                node.path("sub").asText(null)
+            );
+        } catch (IOException | InterruptedException e) {
+            throw GolaException.unauthorized("Failed to verify Google ID token");
+        }
+    }
+
+    private record GoogleTokenPayload(
+        String email,
+        String name,
+        String picture,
+        boolean emailVerified,
+        String subject
+    ) {}
 
     @Transactional
     public AuthResponse refresh(RefreshRequest req) {

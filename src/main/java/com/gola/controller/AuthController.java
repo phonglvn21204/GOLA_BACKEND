@@ -32,6 +32,12 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.ok(authService.login(req)));
     }
 
+    @PostMapping("/login/google")
+    @Operation(summary = "Login with Google ID token")
+    public ResponseEntity<ApiResponse<AuthResponse>> loginWithGoogle(@Valid @RequestBody GoogleLoginRequest req) {
+        return ResponseEntity.ok(ApiResponse.ok(authService.loginWithGoogle(req)));
+    }
+
     @PostMapping("/refresh")
     @Operation(summary = "Refresh access token")
     public ResponseEntity<ApiResponse<AuthResponse>> refresh(@Valid @RequestBody RefreshRequest req) {
