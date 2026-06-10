@@ -34,6 +34,13 @@ public class TripStop {
 
     private String notes;
 
+    private Double lat;
+
+    private Double lng;
+
+    @Column(name = "image_url")
+    private String imageUrl;
+
     @Column(name = "completed_at")
     private Instant completedAt;
 

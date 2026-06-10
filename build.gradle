@@ -89,6 +89,9 @@ dependencies {
     implementation 'com.google.guava:guava:33.2.1-jre'
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
 
+    // Auth0 JWT (for Google OAuth verification)
+    implementation 'com.auth0:java-jwt:4.4.0'
+
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'

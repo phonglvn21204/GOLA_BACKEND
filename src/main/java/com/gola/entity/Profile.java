@@ -57,6 +57,9 @@ public class Profile {
     @Column(name = "phone_verified_at")
     private Instant phoneVerifiedAt;
 
+    @Column(name = "password_hash")
+    private String passwordHash;
+
     @Column(name = "deleted_at")
     private Instant deletedAt;
 

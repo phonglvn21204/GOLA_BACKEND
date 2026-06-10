@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.UUID;
 
-@RestController @RequestMapping("/emergency-contacts")
+@RestController @RequestMapping({"/emergency-contacts", "/me/emergency-contacts"})
 @RequiredArgsConstructor
 @Tag(name = "Emergency Contacts")
 public class EmergencyContactController {
@@ -42,5 +42,16 @@ public class EmergencyContactController {
         if (!c.getUserId().equals(SecurityUtils.getCurrentUserId())) throw GolaException.forbidden();
         repo.delete(c);
         return ResponseEntity.ok(ApiResponse.ok("Deleted", null));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<EmergencyContact>> update(@PathVariable UUID id, @Valid @RequestBody EmergencyContactRequest req) {
+        var c = repo.findById(id).orElseThrow(() -> GolaException.notFound("Contact"));
+        if (!c.getUserId().equals(SecurityUtils.getCurrentUserId())) throw GolaException.forbidden();
+        c.setName(req.getName());
+        c.setPhone(req.getPhone());
+        c.setRelation(req.getRelation());
+        c.setPriority(req.getPriority());
+        return ResponseEntity.ok(ApiResponse.ok("Contact updated", repo.save(c)));
     }
 }

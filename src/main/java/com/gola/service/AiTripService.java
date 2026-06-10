@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gola.dto.ai.AiGeneratedStop;
 import com.gola.dto.ai.GenerateTripRequest;
 import com.gola.dto.trip.AddStopRequest;
+import com.gola.dto.map.PlaceDetail;
 import com.gola.entity.AiJob;
 import com.gola.entity.enums.AiJobKind;
 import com.gola.entity.enums.AiJobStatus;
@@ -17,19 +18,26 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AiTripService {
+
+    private static final java.util.regex.Pattern COORD_PATTERN =
+            java.util.regex.Pattern.compile("Coordinates:\\s*([\\-0-9.]+),\\s*([\\-0-9.]+)");
     private final AiJobRepository jobRepo;
     private final AiQuotaService  quotaService;
     private final TripService     tripService;
     private final GeminiClient    geminiClient;
     private final ObjectMapper    objectMapper;
+    private final PlaceEnrichmentService placeEnrichmentService;
 
     @Transactional
     public Map<String, Object> generateTrip(UUID userId, GenerateTripRequest req, boolean isPremium) {
@@ -65,12 +73,12 @@ public class AiTripService {
             var trip = tripService.createTrip(userId, tripReq);
 
             // Save stops từ plan đầu tiên vào DB
-            List<AiGeneratedStop> stops = extractStops(plans.get(0));
-            int savedStops = saveStops(trip.getId(), userId, stops);
+            List<AiGeneratedStop> stops = extractStops(plans.getFirst());
+            int savedStops = saveStops(trip.getId(), userId, stops, req.getDestination());
             log.info("Saved {} stops for trip:{}", savedStops, trip.getId());
 
             // Gắn tripId vào plan đầu tiên
-            plans.get(0).put("tripId", trip.getId().toString());
+            plans.getFirst().put("tripId", trip.getId().toString());
 
             // Update job
             job.setStatus(AiJobStatus.DONE);
@@ -87,12 +95,12 @@ public class AiTripService {
             failJob(job, e.getMessage());
             throw e;
         } catch (Exception e) {
+            log.error("AI trip generation failed for user:{} error:{}", userId, e.getMessage(), e);
             failJob(job, e.getMessage());
             throw GolaException.badRequest("AI generation failed: " + e.getMessage());
         }
     }
 
-    @SuppressWarnings("unchecked")
     private List<Map<String, Object>> parsePlans(String raw) {
         try {
             // Strip markdown fences nếu có
@@ -120,9 +128,9 @@ public class AiTripService {
             List<AiGeneratedStop> result = new ArrayList<>();
             for (Object dayObj : days) {
                 if (!(dayObj instanceof Map<?, ?> day)) continue;
-                Object dayValue = ((Map<?, ?>) day).get("day");
+                Object dayValue = day.get("day");
                 int dayNum = dayValue == null ? 1 : ((Number) dayValue).intValue();
-                Object itemsObj = ((Map<?, ?>) day).get("items");
+                Object itemsObj = day.get("items");
                 if (!(itemsObj instanceof List<?> items)) continue;
 
                 for (Object itemObj : items) {
@@ -149,9 +157,30 @@ public class AiTripService {
                                     item.getOrDefault("timeOfDay", "MORNING"))
                     ));
 
+                    // Parse lat/lng from direct fields if provided by Gemini
+                    Object latObj = item.getOrDefault("lat", item.get("latitude"));
+                    Object lngObj = item.getOrDefault("lng", item.get("longitude"));
+                    if (latObj instanceof Number latNum && lngObj instanceof Number lngNum) {
+                        stop.setLat(latNum.doubleValue());
+                        stop.setLng(lngNum.doubleValue());
+                    }
+
+                    // Fallback: try parsing from "Coordinates: lat, lng" embedded in description
+                    if (!isValidCoordinate(stop.getLat(), stop.getLng()) && stop.getDescription() != null) {
+                        java.util.regex.Matcher m = COORD_PATTERN.matcher(stop.getDescription());
+                        if (m.find()) {
+                            try {
+                                stop.setLat(Double.parseDouble(m.group(1)));
+                                stop.setLng(Double.parseDouble(m.group(2)));
+                            } catch (NumberFormatException ignored) {
+                            }
+                        }
+                    }
+
                     result.add(stop);
                 }
             }
+
             return result;
         } catch (Exception e) {
             log.warn("Failed to extract stops from plan: {}", e.getMessage());
@@ -159,7 +188,7 @@ public class AiTripService {
         }
     }
 
-    private int saveStops(UUID tripId, UUID userId, List<AiGeneratedStop> stops) {
+    private int saveStops(UUID tripId, UUID userId, List<AiGeneratedStop> stops, String destination) {
         int saved = 0;
         for (AiGeneratedStop aiStop : stops) {
             if (aiStop.getPlaceName() == null || aiStop.getPlaceName().isBlank()) continue;
@@ -168,6 +197,44 @@ public class AiTripService {
                 addReq.setName(aiStop.getPlaceName().trim());
                 addReq.setNotes(AiItineraryParser.buildNotes(aiStop));
                 addReq.setOrderIdx(AiItineraryParser.orderIdxFor(aiStop));
+                boolean hasGeminiCoords = isValidCoordinate(aiStop.getLat(), aiStop.getLng());
+                if (hasGeminiCoords) {
+                    addReq.setLat(aiStop.getLat());
+                    addReq.setLng(aiStop.getLng());
+                }
+                addReq.setArrivalAt(calculateArrivalAt(aiStop.getDay(), aiStop.getTimeOfDay()));
+
+                boolean isRouteStop = aiStop.getPlaceName().matches(
+                        "(?i).*(travel to|travel from|depart|return to|back to|transfer|transit).*"
+                );
+                PlaceDetail detail = isRouteStop ? null : placeEnrichmentService.enrich(aiStop.getPlaceName(), destination);
+                // Cập nhật lat/lng từ Nominatim nếu chính xác hơn
+                if (!hasGeminiCoords && detail != null && isValidCoordinate(detail.getLat(), detail.getLng())) {
+                    addReq.setLat(detail.getLat());
+                    addReq.setLng(detail.getLng());
+                }
+
+                // Final fallback if coords are still null
+                if (addReq.getLat() == null || addReq.getLng() == null) {
+                    double[] coords = getDefaultCityCoordinates(destination);
+                    addReq.setLat(coords[0]);
+                    addReq.setLng(coords[1]);
+                    log.debug("Applied fallback coords for stop '{}' -> [{}, {}]",
+                            aiStop.getPlaceName(), addReq.getLat(), addReq.getLng());
+                }
+
+                // Set imageUrl from enrichment (Wikimedia / Unsplash API / Picsum)
+                if (detail != null && detail.getImageUrl() != null) {
+                    addReq.setImageUrl(detail.getImageUrl());
+                } else {
+                    String picsumUrl = "https://picsum.photos/seed/"
+                            + URLEncoder.encode(aiStop.getPlaceName(), StandardCharsets.UTF_8) + "/800/600";
+                    addReq.setImageUrl(picsumUrl);
+                    log.info("Picsum fallback for '{}': {}", aiStop.getPlaceName(), picsumUrl);
+                }
+
+                log.info("Enriching stop: {} → imageUrl: {}", aiStop.getPlaceName(), addReq.getImageUrl());
+
                 tripService.addStop(tripId, userId, addReq);
                 saved++;
             } catch (Exception e) {
@@ -177,18 +244,62 @@ public class AiTripService {
         return saved;
     }
 
+    private Instant calculateArrivalAt(int day, String timeOfDay) {
+        int hour = switch (timeOfDay == null ? "" : timeOfDay.toLowerCase()) {
+            case "morning" -> 8;
+            case "afternoon" -> 13;
+            case "evening" -> 18;
+            default -> 9;
+        };
+        return LocalDate.now()
+            .plusDays(day - 1)
+            .atTime(hour, 0)
+            .toInstant(ZoneOffset.UTC);
+    }
+
     private void failJob(AiJob job, String message) {
         job.setStatus(AiJobStatus.FAILED);
         job.setError(message);
         jobRepo.save(job);
     }
 
+    private double[] getDefaultCityCoordinates(String city) {
+        // Default coordinates for common cities, with fallback to a generic center point
+        return switch((city == null ? "" : city).toLowerCase()) {
+            case "hanoi", "ha noi", "hà nội" -> new double[]{21.0285, 105.8542};
+            case "ho chi minh", "ho chi minh city", "hcmc", "saigon", "sai gon", "sài gòn" -> new double[]{10.7769, 106.7009};
+            case "da nang", "đà nẵng" -> new double[]{16.0544, 108.2022};
+            case "hoi an", "hội an" -> new double[]{15.8801, 108.3380};
+            case "hue", "huế" -> new double[]{16.4637, 107.5909};
+            case "da lat", "đà lạt" -> new double[]{11.9404, 108.4583};
+            case "nha trang" -> new double[]{12.2388, 109.1967};
+            case "sapa", "sa pa" -> new double[]{22.3364, 103.8438};
+            case "ha long", "hạ long" -> new double[]{20.9712, 107.0448};
+            case "phu quoc", "phú quốc" -> new double[]{10.2899, 103.9840};
+            case "can tho", "cần thơ" -> new double[]{10.0452, 105.7469};
+            case "vung tau", "vũng tàu" -> new double[]{10.4114, 107.1362};
+            case "bangkok" -> new double[]{13.7563, 100.5018};
+            case "paris" -> new double[]{48.8566, 2.3522};
+            case "london" -> new double[]{51.5074, -0.1278};
+            case "new york" -> new double[]{40.7128, -74.0060};
+            case "tokyo" -> new double[]{35.6762, 139.6503};
+            default -> new double[]{16.0, 106.0}; // Center Vietnam fallback
+        };
+    }
+
+    private boolean isValidCoordinate(Double lat, Double lng) {
+        return lat != null && lng != null
+                && Double.isFinite(lat) && Double.isFinite(lng)
+                && lat != 0.0 && lng != 0.0;
+    }
+
     private String buildPrompt(GenerateTripRequest req) {
         String interests = req.getInterests() == null || req.getInterests().isEmpty()
                 ? "general sightseeing"
-                : req.getInterests().stream().collect(Collectors.joining(", "));
+                : String.join(", ", req.getInterests());
 
         return """
+            IMPORTANT: Generate a REAL trip plan for %s, NOT the example below.
             You are a travel planner. Generate exactly 3 different trip plans from %s to %s for %d days.
             Traveler interests: %s. Respond in %s.
 
@@ -206,39 +317,52 @@ public class AiTripService {
             - day (integer, 1-based)
             - items (array of stop objects)
 
-            Each stop object:
-            - time (string: "Morning", "Afternoon", or "Evening")
-            - activity (string, place name)
-            - description (string, short description)
-            - type (string, one of: "sight", "food", "travel", "stay")
+            Each stop object MUST include ALL 6 of these fields (no exceptions):
+            - "time" (REQUIRED: "Morning", "Afternoon", or "Evening")
+            - "activity" (REQUIRED: place name string)
+            - "description" (REQUIRED: short description string)
+            - "type" (REQUIRED: "sight", "food", "travel", or "stay")
+            - "lat" (REQUIRED: decimal degrees latitude, e.g. 11.9404)
+            - "lng" (REQUIRED: decimal degrees longitude, e.g. 108.4385)
+
+            IMPORTANT: Every single item MUST have lat and lng fields with real GPS coordinates. Items without lat/lng will be rejected.
 
             The 3 plans should differ in style:
             Plan 1 (Adventure): active, outdoor, budget %s
             Plan 2 (Budget): affordable, local experiences
             Plan 3 (Premium): luxury, comfort, fine dining
 
-            Example:
+            Example output (follow this exact structure):
             [
               {
-                "name": "Adventure Explorer",
+                "name": "Hanoi Capital Explorer",
                 "badge": "AI Recommended",
-                "budget": "$95",
+                "budget": "$120",
                 "duration": "%d days",
-                "accommodation": "Mountain Hostel",
-                "foodStyle": "Street food + local",
+                "accommodation": "Old Quarter Hostel",
+                "foodStyle": "Street food + local cafe",
                 "timeline": [
                   {
                     "day": 1,
                     "items": [
-                      { "time": "Morning", "activity": "Da Nang Beach", "description": "Start with a swim", "type": "sight" },
-                      { "time": "Afternoon", "activity": "Marble Mountains", "description": "Explore caves", "type": "sight" },
-                      { "time": "Evening", "activity": "Han River Night Market", "description": "Street food dinner", "type": "food" }
+                      { "time": "Morning",   "activity": "Hoan Kiem Lake",       "description": "Morning walk around the scenic lake", "type": "sight", "lat": 21.0285, "lng": 105.8542 },
+                      { "time": "Afternoon", "activity": "Old Quarter",          "description": "Explore the ancient streets",         "type": "sight", "lat": 21.0340, "lng": 105.8500 },
+                      { "time": "Evening",   "activity": "Ta Hien Beer Street",  "description": "Local food and drinks",               "type": "food",  "lat": 21.0345, "lng": 105.8519 }
+                    ]
+                  },
+                  {
+                    "day": 2,
+                    "items": [
+                      { "time": "Morning",   "activity": "Temple of Literature", "description": "Visit the first university",          "type": "sight", "lat": 21.0236, "lng": 105.8357 },
+                      { "time": "Afternoon", "activity": "Ho Chi Minh Mausoleum", "description": "Historic landmark",                  "type": "sight", "lat": 21.0366, "lng": 105.8344 },
+                      { "time": "Evening",   "activity": "West Lake",            "description": "Sunset views and dinner",             "type": "sight", "lat": 21.0560, "lng": 105.8239 }
                     ]
                   }
                 ]
               }
             ]
             """.formatted(
+                req.getDestination(),
                 req.getOrigin(), req.getDestination(), req.getDays(),
                 interests, req.getLanguage(),
                 req.getBudget(),

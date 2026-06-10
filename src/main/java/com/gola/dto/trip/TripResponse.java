@@ -27,4 +27,8 @@ public class TripResponse {
     private Instant updatedAt;
     private List<TripStopResponse> stops;
     private List<TripMemberResponse> members;
+    private Double totalDistanceKm;
+    private Integer totalTravelTimeMin;
+    private Double distanceFromUserKm;
+    private Integer travelTimeFromUserMin;
 }

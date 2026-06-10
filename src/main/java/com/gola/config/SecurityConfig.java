@@ -1,6 +1,5 @@
 package com.gola.config;
 
-import com.gola.config.GolaProperties;
 import com.gola.security.JwtAuthFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -28,53 +27,123 @@ import java.util.List;
 @EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
+
     private final JwtAuthFilter jwtAuthFilter;
     private final GolaProperties golaProperties;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         return http
-            .csrf(AbstractHttpConfigurer::disable)
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                .requestMatchers("/actuator/health", "/actuator/info").permitAll()
-                .requestMatchers(HttpMethod.POST, "/auth/register", "/auth/login",
-                    "/auth/refresh", "/auth/forgot-password", "/auth/reset-password").permitAll()
-                .requestMatchers(HttpMethod.GET,  "/pricing/**", "/emergency/hotlines").permitAll()
-                .requestMatchers(HttpMethod.POST, "/webhooks/stripe").permitAll()
-                .requestMatchers("/admin/**").hasRole("ADMIN")
-                .anyRequest().authenticated()
-            )
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-            .build();
+                .csrf(AbstractHttpConfigurer::disable)
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
+
+                        // Swagger
+                        .requestMatchers(
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html"
+                        ).permitAll()
+
+                        // Actuator
+                        .requestMatchers(
+                                "/actuator/health",
+                                "/actuator/info"
+                        ).permitAll()
+
+                        // Auth APIs
+                        .requestMatchers(HttpMethod.POST,
+                                "/auth/register",
+                                "/auth/login",
+                                "/auth/google",
+                                "/auth/refresh",
+                                "/auth/forgot-password",
+                                "/auth/verify-otp",
+                                "/auth/verify-email",
+                                "/auth/reset-password"
+                        ).permitAll()
+
+                        // Public APIs
+                        .requestMatchers(HttpMethod.GET,
+                                "/pricing/**",
+                                "/emergency/hotlines"
+                        ).permitAll()
+
+                        // Stripe webhook
+                        .requestMatchers(HttpMethod.POST,
+                                "/webhooks/stripe"
+                        ).permitAll()
+
+                        // Admin APIs
+                        .requestMatchers("/admin/**")
+                        .hasRole("ADMIN")
+
+                        .anyRequest()
+                        .authenticated()
+                )
+                .addFilterBefore(
+                        jwtAuthFilter,
+                        UsernamePasswordAuthenticationFilter.class
+                )
+                .build();
     }
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-        var config = new CorsConfiguration();
+
+        CorsConfiguration config = new CorsConfiguration();
+
         config.setAllowedOriginPatterns(List.of(
-                "http://localhost:5173",
-                "http://127.0.0.1:5173",
-                golaProperties.getFrontendUrl(),
                 "http://localhost:3000",
                 "http://127.0.0.1:3000",
+
+                "http://localhost:5173",
+                "http://127.0.0.1:5173",
+
+                "http://localhost:8081",
+                "http://127.0.0.1:8081",
+
+                golaProperties.getFrontendUrl(),
+
                 "https://gola-way-ai-route.vercel.app"
         ));
-        config.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
+
+        config.setAllowedMethods(List.of(
+                "GET",
+                "POST",
+                "PUT",
+                "PATCH",
+                "DELETE",
+                "OPTIONS"
+        ));
+
         config.setAllowedHeaders(List.of("*"));
-        config.setExposedHeaders(List.of("Authorization"));
+
+        config.setExposedHeaders(List.of(
+                "Authorization"
+        ));
+
         config.setAllowCredentials(true);
-        var source = new UrlBasedCorsConfigurationSource();
+
+        UrlBasedCorsConfigurationSource source =
+                new UrlBasedCorsConfigurationSource();
+
         source.registerCorsConfiguration("/**", config);
+
         return source;
     }
 
-    @Bean public PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
 
     @Bean
-    public AuthenticationManager authManager(AuthenticationConfiguration config) throws Exception {
+    public AuthenticationManager authManager(
+            AuthenticationConfiguration config
+    ) throws Exception {
         return config.getAuthenticationManager();
     }
 }

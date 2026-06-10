@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gola.config.GolaProperties;
 import com.gola.exception.GolaException;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpEntity;
@@ -20,16 +19,22 @@ import java.util.Map;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class GeminiClient {
 
     private static final String BASE_URL =
         "https://generativelanguage.googleapis.com/v1beta";
 
     private final GolaProperties properties;
-    @Qualifier("geminiRestTemplate")
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
+
+    public GeminiClient(GolaProperties properties,
+                       @Qualifier("geminiRestTemplate") RestTemplate restTemplate,
+                       ObjectMapper objectMapper) {
+        this.properties = properties;
+        this.restTemplate = restTemplate;
+        this.objectMapper = objectMapper;
+    }
 
     public String generateContent(String prompt) {
         var gemini = properties.getGemini();

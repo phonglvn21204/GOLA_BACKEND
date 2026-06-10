@@ -91,6 +91,10 @@ public final class AiItineraryParser {
             if (!sb.isEmpty()) sb.append("\n");
             sb.append("Time: ").append(stop.getTimeOfDay());
         }
+        if (stop.getImageUrl() != null && !stop.getImageUrl().isBlank()) {
+            if (!sb.isEmpty()) sb.append("\n");
+            sb.append("Image: ").append(stop.getImageUrl());
+        }
         return sb.isEmpty() ? null : sb.toString();
     }
 

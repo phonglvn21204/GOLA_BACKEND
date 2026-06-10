@@ -48,6 +48,11 @@ public class IncidentService {
         return mapToResponse(incident);
     }
 
+    public PageResponse<IncidentResponse> getNearbyIncidents(int page, int size) {
+        return new PageResponse<>(incidentRepo.findByStatusOrderByCreatedAtDesc("OPEN", PageRequest.of(page, size))
+            .map(this::mapToResponse));
+    }
+
     @Transactional
     public IncidentResponse updateIncidentStatus(UUID id, String status) {
         var incident = incidentRepo.findById(id)

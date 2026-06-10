@@ -36,7 +36,7 @@ public class GolaProperties {
     }
     @Data public static class Gemini {
         private String apiKey;
-        private String model = "gemini-2.5-flash";
+        private String model = "gemini-3.1-flash-lite";
     }
     @Data public static class RateLimit {
         private boolean enabled = true;

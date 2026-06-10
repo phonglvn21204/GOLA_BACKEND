@@ -14,4 +14,7 @@ public class TripStopResponse {
     private Integer durationMin;
     private String notes;
     private Instant completedAt;
+    private Double lat;
+    private Double lng;
+    private String imageUrl;
 }

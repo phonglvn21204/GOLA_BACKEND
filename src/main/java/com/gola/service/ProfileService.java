@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Slf4j
@@ -44,6 +45,23 @@ public class ProfileService {
         if (req.getPhone()       != null) profile.setPhone(req.getPhone());
         if (req.getIsPublic()    != null) profile.setPublic(req.getIsPublic());
 
+        return toResponse(profileRepo.save(profile));
+    }
+
+    @Transactional
+    public ProfileResponse updateAvatar(UUID userId, String avatarUrl) {
+        Profile profile = findProfile(userId);
+        profile.setAvatarUrl(avatarUrl);
+        return toResponse(profileRepo.save(profile));
+    }
+
+    @Transactional
+    public ProfileResponse completeOnboarding(UUID userId, UpdateProfileRequest req) {
+        Profile profile = findProfile(userId);
+        if (req.getHomeCity() != null) profile.setHomeCity(req.getHomeCity());
+        if (req.getLocale() != null) profile.setLocale(req.getLocale());
+        if (req.getTheme() != null) profile.setTheme(req.getTheme());
+        profile.setOnboardedAt(Instant.now());
         return toResponse(profileRepo.save(profile));
     }
 

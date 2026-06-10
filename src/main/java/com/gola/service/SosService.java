@@ -76,7 +76,7 @@ public class SosService {
         }
     }
 
-    private SosResponse mapToResponse(SosEvent e) {
+    public SosResponse mapToResponse(SosEvent e) {
         return SosResponse.builder().id(e.getId()).userId(e.getUserId()).tripId(e.getTripId())
             .latitude(e.getLatitude()).longitude(e.getLongitude())
             .status(e.getStatus()).createdAt(e.getCreatedAt()).build();

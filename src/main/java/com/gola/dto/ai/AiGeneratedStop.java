@@ -12,4 +12,5 @@ public class AiGeneratedStop {
     private String description;
     private Double lat;
     private Double lng;
+    private String imageUrl;
 }

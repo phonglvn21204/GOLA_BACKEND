@@ -47,6 +47,19 @@ public class AlbumService {
     }
 
     @Transactional
+    public AlbumResponse addPhoto(UUID albumId, UUID userId, String photoUrl) {
+        var album = albumRepo.findById(albumId)
+            .orElseThrow(() -> GolaException.notFound("Album"));
+        if (!album.getOwnerId().equals(userId)) {
+            throw GolaException.forbidden();
+        }
+        if (album.getCoverUrl() == null || album.getCoverUrl().isBlank()) {
+            album.setCoverUrl(photoUrl);
+        }
+        return mapToResponse(albumRepo.save(album));
+    }
+
+    @Transactional
     public void deleteAlbum(UUID albumId, UUID userId) {
         var album = albumRepo.findById(albumId)
             .orElseThrow(() -> GolaException.notFound("Album"));

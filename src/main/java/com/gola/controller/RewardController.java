@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/rewards")
@@ -34,6 +35,15 @@ public class RewardController {
     @PostMapping("/redeem")
     @Operation(summary = "Redeem a reward using coins")
     public ResponseEntity<ApiResponse<Redemption>> redeemReward(@Valid @RequestBody RedemptionRequest req) {
+        Redemption redemption = redemptionService.redeemReward(SecurityUtils.getCurrentUserId(), req);
+        return ResponseEntity.ok(ApiResponse.ok("Reward redeemed successfully", redemption));
+    }
+
+    @PostMapping("/{id}/redeem")
+    @Operation(summary = "Redeem a reward using coins")
+    public ResponseEntity<ApiResponse<Redemption>> redeemRewardById(@PathVariable UUID id) {
+        RedemptionRequest req = new RedemptionRequest();
+        req.setRewardId(id);
         Redemption redemption = redemptionService.redeemReward(SecurityUtils.getCurrentUserId(), req);
         return ResponseEntity.ok(ApiResponse.ok("Reward redeemed successfully", redemption));
     }

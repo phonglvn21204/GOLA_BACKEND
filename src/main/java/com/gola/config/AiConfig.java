@@ -17,4 +17,22 @@ public class AiConfig {
             .setReadTimeout(Duration.ofSeconds(120))
             .build();
     }
+
+    @Bean("osrmRestTemplate")
+    public RestTemplate osrmRestTemplate(RestTemplateBuilder builder) {
+        return builder
+            .setConnectTimeout(Duration.ofSeconds(5))
+            .setReadTimeout(Duration.ofSeconds(10))
+            .build();
+    }
+
+    @Bean("nominatimRestTemplate")
+    public RestTemplate nominatimRestTemplate() {
+        RestTemplate rt = new RestTemplate();
+        rt.getInterceptors().add((request, body, execution) -> {
+            request.getHeaders().set("User-Agent", "gola-travel-app/1.0");
+            return execution.execute(request, body);
+        });
+        return rt;
+    }
 }

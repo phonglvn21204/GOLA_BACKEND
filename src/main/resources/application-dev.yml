@@ -3,6 +3,10 @@
     show-sql: true
   flyway:
     clean-on-validation-error: false
+
+unsplash:
+  access-key: ${UNSPLASH_ACCESS_KEY:9Zb_n408rX5dIM4vrq25ZSQdfsIBR1aetIBlKu939gc}
+
 logging:
   level:
     com.gola: DEBUG

@@ -12,4 +12,7 @@ public class AddStopRequest {
     private Integer durationMin;
     private String notes;
     private Double orderIdx;
+    private Double lat;
+    private Double lng;
+    private String imageUrl;
 }

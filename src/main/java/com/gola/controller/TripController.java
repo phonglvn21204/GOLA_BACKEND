@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +21,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/trips")
 @RequiredArgsConstructor
+@Slf4j
 @Tag(name = "Trips", description = "CRUD, live sessions, share")
 public class TripController {
     private final TripService tripService;
@@ -42,8 +44,13 @@ public class TripController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get trip details")
-    public ResponseEntity<ApiResponse<TripResponse>> getTrip(@PathVariable UUID id) {
-        return ResponseEntity.ok(ApiResponse.ok(tripService.getTrip(id, SecurityUtils.getCurrentUserId())));
+    public ResponseEntity<ApiResponse<TripResponse>> getTrip(
+            @PathVariable UUID id,
+            @RequestParam(required = false) Double userLat,
+            @RequestParam(required = false) Double userLng) {
+        log.info("[TripController.getTrip] id={} userLat={} userLng={}", id, userLat, userLng);
+        return ResponseEntity.ok(ApiResponse.ok(
+                tripService.getTrip(id, SecurityUtils.getCurrentUserId(), userLat, userLng)));
     }
 
     @PatchMapping("/{id}")
@@ -95,5 +102,12 @@ public class TripController {
             @PathVariable UUID id, @RequestBody ShareTripRequest req) {
         String token = tripService.createShareLink(id, SecurityUtils.getCurrentUserId(), req);
         return ResponseEntity.ok(ApiResponse.ok("Share link created", Map.of("token", token)));
+    }
+
+    @PostMapping("/{id}/post-trip-summary")
+    @Operation(summary = "Generate post-trip summary")
+    public ResponseEntity<ApiResponse<TripResponse>> postTripSummary(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.ok("Post-trip summary ready",
+                tripService.getTrip(id, SecurityUtils.getCurrentUserId(), null, null)));
     }
 }

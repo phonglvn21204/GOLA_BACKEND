@@ -52,6 +52,17 @@ public class QuestController {
         return ResponseEntity.ok(ApiResponse.ok("Proof submitted successfully", progress));
     }
 
+    @PostMapping("/{id}/checkin")
+    @Operation(summary = "GPS check-in for the current quest task")
+    public ResponseEntity<ApiResponse<QuestProgressResponse>> checkIn(
+            @PathVariable UUID id,
+            @RequestBody SubmitProofRequest req) {
+        var userId = SecurityUtils.getCurrentUserId();
+        var current = questService.getUserProgress(id, userId);
+        var progress = questService.submitProof(id, current.getTaskIdx(), userId, req.getMediaId(), req.getLat(), req.getLng());
+        return ResponseEntity.ok(ApiResponse.ok("Check-in submitted successfully", progress));
+    }
+
     @GetMapping("/{id}/progress")
     @Operation(summary = "Get user progress for a quest")
     public ResponseEntity<ApiResponse<QuestProgressResponse>> getUserProgress(@PathVariable UUID id) {

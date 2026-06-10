@@ -11,7 +11,7 @@ This architecture provides the simplicity and deployment ease of a monolith whil
 - **Caching & Rate Limiting**: Redis
 - **Security**: Spring Security + JWT
 - **Real-time**: Spring WebSocket (STOMP) over WebSocket for chat, live location, SOS
-- **AI**: Google Gemini Pro & Flash (via Spring integration or direct API)
+- **AI**: Google Gemini Flash Lite (via Spring integration or direct API)
 - **Payments**: Stripe API
 - **APIs**: Springdoc OpenAPI / Swagger
 

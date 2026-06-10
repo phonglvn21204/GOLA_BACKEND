@@ -44,6 +44,16 @@ public class IncidentController {
                 incidentService.getUserIncidents(SecurityUtils.getCurrentUserId(), page, size)));
     }
 
+    @GetMapping("/nearby")
+    @Operation(summary = "Get nearby open incidents")
+    public ResponseEntity<ApiResponse<PageResponse<IncidentResponse>>> getNearbyIncidents(
+            @RequestParam(required = false) Double lat,
+            @RequestParam(required = false) Double lng,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(ApiResponse.ok(incidentService.getNearbyIncidents(page, size)));
+    }
+
     @GetMapping("/{id}")
     @Operation(summary = "Get incident by ID")
     public ResponseEntity<ApiResponse<IncidentResponse>> getIncidentById(@PathVariable UUID id) {

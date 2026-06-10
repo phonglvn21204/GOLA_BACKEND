@@ -6,6 +6,7 @@ import com.gola.dto.community.CreatePostRequest;
 import com.gola.dto.community.PostResponse;
 import com.gola.security.SecurityUtils;
 import com.gola.service.PostService;
+import com.gola.service.PostReactionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -22,6 +23,7 @@ import java.util.UUID;
 @Tag(name = "Posts", description = "Community post feed and tags")
 public class PostController {
     private final PostService postService;
+    private final PostReactionService postReactionService;
 
     @PostMapping
     @Operation(summary = "Create a new post")
@@ -34,6 +36,14 @@ public class PostController {
     @GetMapping("/feed")
     @Operation(summary = "Get paginated post feed")
     public ResponseEntity<ApiResponse<PageResponse<PostResponse>>> getFeed(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(ApiResponse.ok(postService.getFeed(page, size)));
+    }
+
+    @GetMapping("/trip-stories")
+    @Operation(summary = "Get paginated trip stories")
+    public ResponseEntity<ApiResponse<PageResponse<PostResponse>>> getTripStories(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(ApiResponse.ok(postService.getFeed(page, size)));
@@ -60,5 +70,14 @@ public class PostController {
         var userId = SecurityUtils.getCurrentUserId();
         postService.deletePost(id, userId);
         return ResponseEntity.ok(ApiResponse.ok("Post deleted successfully", null));
+    }
+
+    @PostMapping("/{id}/like")
+    @Operation(summary = "Like a post")
+    public ResponseEntity<ApiResponse<Void>> likePost(@PathVariable UUID id) {
+        var req = new com.gola.dto.community.ReactionRequest();
+        req.setKind(com.gola.entity.enums.ReactionKind.LIKE);
+        postReactionService.reactToPost(id, SecurityUtils.getCurrentUserId(), req);
+        return ResponseEntity.ok(ApiResponse.ok("Post liked", null));
     }
 }

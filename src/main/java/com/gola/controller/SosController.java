@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 import java.util.UUID;
+import java.util.List;
 
 @RestController @RequestMapping("/sos")
 @RequiredArgsConstructor
@@ -30,5 +31,13 @@ public class SosController {
     public ResponseEntity<ApiResponse<Void>> resolve(@PathVariable UUID sosId, @RequestBody Map<String,String> body) {
         sosService.resolveSos(sosId, SecurityUtils.getCurrentUserId(), body.get("reason"));
         return ResponseEntity.ok(ApiResponse.ok("SOS resolved", null));
+    }
+
+    @GetMapping("/active")
+    @Operation(summary = "List active SOS events")
+    public ResponseEntity<ApiResponse<List<SosResponse>>> active() {
+        return ResponseEntity.ok(ApiResponse.ok(sosService.getActiveSosEvents().stream()
+                .map(sosService::mapToResponse)
+                .toList()));
     }
 }

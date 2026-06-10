@@ -75,6 +75,20 @@ public class TripSessionService {
         return toResponse(session);
     }
 
+    @Transactional
+    public TripSessionResponse endSessionById(UUID sessionId, UUID userId) {
+        TripSession session = sessionRepo.findById(sessionId)
+                .orElseThrow(() -> GolaException.notFound("Session"));
+        return endSession(session.getTripId(), userId);
+    }
+
+    public TripSessionResponse getSessionById(UUID sessionId, UUID userId) {
+        TripSession session = sessionRepo.findById(sessionId)
+                .orElseThrow(() -> GolaException.notFound("Session"));
+        requireMember(session.getTripId(), userId);
+        return toResponse(session);
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private void requireEditorOrOwner(UUID tripId, UUID userId) {

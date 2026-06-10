@@ -18,7 +18,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AuthControllerIT extends BaseIntegrationTest {
 
     @Test
-    void register_returnsCreatedWithTokens() throws Exception {
+    void register_returnsCreatedWithoutTokens() throws Exception {
         var req = new RegisterRequest();
         req.setEmail("it-user-" + UUID.randomUUID() + "@example.com");
         req.setPassword(TestDataConstants.SEED_PASSWORD);
@@ -31,9 +31,7 @@ class AuthControllerIT extends BaseIntegrationTest {
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.accessToken").isNotEmpty())
-                .andExpect(jsonPath("$.data.refreshToken").isNotEmpty())
-                .andExpect(jsonPath("$.data.user.email").value(req.getEmail()))
+                .andExpect(jsonPath("$.data").value("Account created. Please verify your email."))
                 .andReturn();
         assertApiSuccess(result);
     }

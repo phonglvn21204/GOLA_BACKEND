@@ -8,6 +8,7 @@ import com.gola.service.AlbumService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -46,10 +47,22 @@ public class AlbumController {
         return ResponseEntity.ok(ApiResponse.ok(albumService.getAlbumById(id)));
     }
 
+    @PostMapping("/{id}/photos")
+    @Operation(summary = "Attach a photo URL to an album")
+    public ResponseEntity<ApiResponse<AlbumResponse>> addPhoto(@PathVariable UUID id, @RequestBody AddAlbumPhotoRequest req) {
+        return ResponseEntity.ok(ApiResponse.ok("Photo added",
+                albumService.addPhoto(id, SecurityUtils.getCurrentUserId(), req.getUrl())));
+    }
+
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete an album (owner only)")
     public ResponseEntity<ApiResponse<Void>> deleteAlbum(@PathVariable UUID id) {
         albumService.deleteAlbum(id, SecurityUtils.getCurrentUserId());
         return ResponseEntity.ok(ApiResponse.ok("Album deleted", null));
+    }
+
+    @Data
+    public static class AddAlbumPhotoRequest {
+        private String url;
     }
 }
