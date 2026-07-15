@@ -22,6 +22,10 @@ public class Comment extends BaseEntity {
     @Column(nullable = false, length = 2000)
     private String body;
 
+    @Builder.Default
+    @Column(name = "is_hidden", nullable = false)
+    private boolean hidden = false;
+
     /** Null means top-level comment; non-null means reply */
     @Column(name = "parent_id")
     private UUID parentId;

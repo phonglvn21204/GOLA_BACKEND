@@ -54,8 +54,17 @@ public class Trip {
 
     private String description;
 
+    @Column(name = "quality_score")
+    private Integer qualityScore;
+
+    @Column(name = "quality_warning")
+    private String qualityWarning;
+
     @Column(name = "deleted_at")
     private Instant deletedAt;
+
+    @Column(name = "completed_at")
+    private Instant completedAt;
 
     @CreatedDate
     @Column(name = "created_at", updatable = false)

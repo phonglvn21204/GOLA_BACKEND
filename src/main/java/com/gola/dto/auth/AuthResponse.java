@@ -1,7 +1,10 @@
 package com.gola.dto.auth;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Data;
+
+import java.util.List;
 
 @Data @Builder
 public class AuthResponse {
@@ -17,6 +20,9 @@ public class AuthResponse {
         private String displayName;
         private String avatarUrl;
         private String role;
+        private List<String> roles;
+        @JsonProperty("isAdmin")
+        private boolean isAdmin;
         private boolean emailVerified;
     }
 }

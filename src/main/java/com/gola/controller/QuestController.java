@@ -48,7 +48,7 @@ public class QuestController {
             @PathVariable Integer taskIdx,
             @RequestBody SubmitProofRequest req) {
         var userId = SecurityUtils.getCurrentUserId();
-        var progress = questService.submitProof(id, taskIdx, userId, req.getMediaId(), req.getLat(), req.getLng());
+        var progress = questService.submitProof(id, taskIdx, userId, req.getMediaId(), req.getProofImageUrl(), req.getLat(), req.getLng());
         return ResponseEntity.ok(ApiResponse.ok("Proof submitted successfully", progress));
     }
 
@@ -59,7 +59,7 @@ public class QuestController {
             @RequestBody SubmitProofRequest req) {
         var userId = SecurityUtils.getCurrentUserId();
         var current = questService.getUserProgress(id, userId);
-        var progress = questService.submitProof(id, current.getTaskIdx(), userId, req.getMediaId(), req.getLat(), req.getLng());
+        var progress = questService.submitProof(id, current.getTaskIdx(), userId, req.getMediaId(), req.getProofImageUrl(), req.getLat(), req.getLng());
         return ResponseEntity.ok(ApiResponse.ok("Check-in submitted successfully", progress));
     }
 
@@ -68,5 +68,29 @@ public class QuestController {
     public ResponseEntity<ApiResponse<QuestProgressResponse>> getUserProgress(@PathVariable UUID id) {
         var userId = SecurityUtils.getCurrentUserId();
         return ResponseEntity.ok(ApiResponse.ok(questService.getUserProgress(id, userId)));
+    }
+
+    @PostMapping("/progress/{progressId}/start")
+    @Operation(summary = "Start a trip-scoped quest progress item")
+    public ResponseEntity<ApiResponse<QuestProgressResponse>> startProgress(@PathVariable UUID progressId) {
+        var userId = SecurityUtils.getCurrentUserId();
+        return ResponseEntity.ok(ApiResponse.ok("Quest started", questService.startProgress(progressId, userId)));
+    }
+
+    @PostMapping("/progress/{progressId}/complete")
+    @Operation(summary = "Complete a trip-scoped quest progress item")
+    public ResponseEntity<ApiResponse<QuestProgressResponse>> completeProgress(
+            @PathVariable UUID progressId,
+            @RequestBody SubmitProofRequest req) {
+        var userId = SecurityUtils.getCurrentUserId();
+        var progress = questService.completeProgress(
+                progressId,
+                userId,
+                req.getMediaId(),
+                req.getProofImageUrl(),
+                req.getLat(),
+                req.getLng()
+        );
+        return ResponseEntity.ok(ApiResponse.ok("Quest completed", progress));
     }
 }

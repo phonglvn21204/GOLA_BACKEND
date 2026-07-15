@@ -27,6 +27,9 @@ public interface LiveLocationRepository extends JpaRepository<LiveLocation, Live
     /** Most recent single ping for a user */
     Optional<LiveLocation> findTopBySessionIdAndUserIdOrderByTsDesc(UUID sessionId, UUID userId);
 
+    /** Most recent single ping for a user across sessions */
+    Optional<LiveLocation> findTopByUserIdOrderByTsDesc(UUID userId);
+
     /** Cleanup old location rows */
     void deleteByTsBefore(Instant cutoff);
 

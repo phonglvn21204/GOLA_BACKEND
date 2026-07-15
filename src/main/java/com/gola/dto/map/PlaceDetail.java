@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -22,4 +24,21 @@ public class PlaceDetail {
     private Boolean wheelchair;    // hỗ trợ xe lăn
     private String imageUrl;       // URL ảnh từ Wikimedia
     private String wikidataId;     // để dùng sau nếu cần
+    private BigDecimal rating;
+    private Integer reviewCount;
+    private String imageSource;
+    private String placeAddress;
+    private String dataSource;
+    private String enrichmentStatus;
+    private Boolean hasRealPhoto;
+    private Boolean hasRealCoordinates;
+    private Boolean hasOpeningHours;
+    private Boolean openNow;
+    private String businessStatus;
+    private String nextOpenCloseText;
+    private BigDecimal estimatedCost;
+    private String providerTitle;
+    private String providerSource;
+    private String providerId;
+    private String rejectedReason;
 }

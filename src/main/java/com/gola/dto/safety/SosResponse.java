@@ -11,5 +11,9 @@ import java.util.UUID;
     private Double latitude;
     private Double longitude;
     private SosStatus status;
+    private Instant acknowledgedAt;
+    private UUID acknowledgedBy;
+    private Instant resolvedAt;
+    private UUID resolvedBy;
     private Instant createdAt;
 }

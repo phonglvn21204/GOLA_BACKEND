@@ -1,5 +1,6 @@
 package com.gola.controller;
 
+import com.gola.dto.ai.ConfirmAiPlanRequest;
 import com.gola.dto.ai.GenerateTripRequest;
 import com.gola.service.AiTripService;
 import com.gola.service.BillingService;
@@ -28,5 +29,13 @@ public class AiController {
         UUID userId = SecurityUtils.getCurrentUserId();
         var result = aiTripService.generateTrip(userId, req, billingService.hasActivePremium(userId));
         return ResponseEntity.ok(ApiResponse.ok("Trip generated", result));
+    }
+
+    @PostMapping("/confirm-trip")
+    @Operation(summary = "Persist the selected AI itinerary")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> confirmTrip(@Valid @RequestBody ConfirmAiPlanRequest req) {
+        UUID userId = SecurityUtils.getCurrentUserId();
+        var result = aiTripService.confirmTripPlan(userId, req);
+        return ResponseEntity.ok(ApiResponse.ok("Trip plan confirmed", result));
     }
 }

@@ -1,4 +1,4 @@
-﻿.gradle/
+.gradle/
 build/
 *.class
 *.jar
@@ -7,7 +7,14 @@ out/
 .idea/
 *.iml
 .env
+src/main/resources/firebase-service-account.json
 *.log
 target/
 __pycache__/
 .DS_Store
+ADMIN_CREDENTIALS.local.txt
+
+
+uploads/
+*.err
+*.out

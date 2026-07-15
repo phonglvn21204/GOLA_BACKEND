@@ -2,7 +2,10 @@ package com.gola.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.Instant;
@@ -36,7 +39,40 @@ public class Album {
     @Builder.Default
     private boolean isAiCurated = false;
 
+    @Column(name = "album_source", nullable = false)
+    @Builder.Default
+    private String albumSource = "ITINERARY";
+
+    @Column(nullable = false)
+    @Builder.Default
+    private String status = "NOT_GENERATED";
+
+    private String summary;
+
+    private String mood;
+
+    @Column(name = "cover_caption")
+    private String coverCaption;
+
+    @Column(name = "share_caption")
+    private String shareCaption;
+
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(columnDefinition = "text[]")
+    @Builder.Default
+    private String[] hashtags = new String[0];
+
+    @Column(name = "error_message")
+    private String errorMessage;
+
+    @Column(name = "generated_at")
+    private Instant generatedAt;
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+
+    @LastModifiedDate
+    @Column(name = "updated_at")
+    private Instant updatedAt;
 }

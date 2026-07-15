@@ -30,6 +30,11 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
 
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 25MB
+
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -52,36 +57,90 @@ server:
   port: ${PORT:8080}
   servlet:
     context-path: /api
+    encoding:
+      charset: UTF-8
+      force: true
+      enabled: true
   compression:
     enabled: true
 
 unsplash:
   access-key: ${UNSPLASH_ACCESS_KEY:}
 
+scrapingdog:
+  enabled: ${SCRAPINGDOG_ENABLED:false}
+  api-key: ${SCRAPINGDOG_API_KEY:}
+  base-url: ${SCRAPINGDOG_BASE_URL:https://api.scrapingdog.com/google}
+  country: ${SCRAPINGDOG_COUNTRY:vn}
+  domain: ${SCRAPINGDOG_DOMAIN:google.com}
+  combined-output: ${SCRAPINGDOG_COMBINED_OUTPUT:true}
+  timeout-ms: ${SCRAPINGDOG_TIMEOUT_MS:8000}
+  max-queries-per-trip: ${SCRAPINGDOG_MAX_QUERIES_PER_TRIP:1}
+  cache-enabled: ${SCRAPINGDOG_CACHE_ENABLED:true}
+  cache-ttl-days: ${SCRAPINGDOG_CACHE_TTL_DAYS:14}
+  only-for-premium: ${SCRAPINGDOG_ONLY_FOR_PREMIUM:false}
+
 gola:
+  payment:
+    provider: ${PAYMENT_PROVIDER:VIETQR}
   ai:
-    quota:
-      enabled: true
+    generate:
+      mode: ${GOLA_AI_GENERATE_MODE:ai_first}
+      use-verified-candidate-pool: ${GOLA_AI_GENERATE_USE_VERIFIED_CANDIDATE_POOL:false}
+      use-scrapingdog-context: ${GOLA_AI_GENERATE_USE_SCRAPINGDOG_CONTEXT:true}
+      enrich-after-gemini: ${GOLA_AI_GENERATE_ENRICH_AFTER_GEMINI:true}
+      critic-enabled: ${GOLA_AI_GENERATE_CRITIC_ENABLED:false}
+      deep-gap-filler-enabled: ${GOLA_AI_GENERATE_DEEP_GAP_FILLER_ENABLED:false}
+      route-during-preview: ${GOLA_AI_GENERATE_ROUTE_DURING_PREVIEW:false}
+      max-provider-calls: ${GOLA_AI_GENERATE_MAX_PROVIDER_CALLS:10}
+      max-candidates-to-verify: ${GOLA_AI_GENERATE_MAX_CANDIDATES_TO_VERIFY:12}
+      target-verified-candidates: ${GOLA_AI_GENERATE_TARGET_VERIFIED_CANDIDATES:10}
+      fallback-category-search-enabled: ${GOLA_AI_GENERATE_FALLBACK_CATEGORY_SEARCH_ENABLED:true}
+    improve:
+      critic-enabled: ${GOLA_AI_IMPROVE_CRITIC_ENABLED:true}
+      max-provider-calls: ${GOLA_AI_IMPROVE_MAX_PROVIDER_CALLS:20}
   jwt:
     secret: ${JWT_SECRET:please-change-this-secret-in-production-must-be-256-bits}
-    access-token-expiry-ms: ${JWT_ACCESS_EXPIRY:900000}
-    refresh-token-expiry-ms: ${JWT_REFRESH_EXPIRY:604800000}
+    access-token-expiry-ms: ${JWT_ACCESS_EXPIRY:3600000}
+    refresh-token-expiry-ms: ${JWT_REFRESH_EXPIRY:2592000000}
   frontend-url: ${FRONTEND_URL:http://localhost:5173}
+  # Public origin used for Open Graph share pages and absolute media URLs.
+  # Use an HTTPS deployed/ngrok URL when testing Facebook previews.
+  public-url: ${APP_PUBLIC_URL:http://localhost:8080}
   google:
     client-id: ${GOOGLE_CLIENT_ID:}
   stripe:
     secret-key: ${STRIPE_SECRET_KEY:}
     webhook-secret: ${STRIPE_WEBHOOK_SECRET:}
     publishable-key: ${STRIPE_PUBLISHABLE_KEY:}
+  vietqr:
+    bank-bin: ${VIETQR_BANK_BIN:}
+    account-no: ${VIETQR_ACCOUNT_NO:}
+    account-name: ${VIETQR_ACCOUNT_NAME:}
+    template: ${VIETQR_TEMPLATE:compact2}
+    description-prefix: ${VIETQR_DESCRIPTION_PREFIX:GOLA}
+  bank-webhook:
+    provider: ${BANK_WEBHOOK_PROVIDER:}
+  sepay:
+    webhook-secret: ${SEPAY_WEBHOOK_SECRET:}
+    allowed-account-no: ${SEPAY_ALLOWED_ACCOUNT_NO:}
   twilio:
     account-sid: ${TWILIO_ACCOUNT_SID:}
     auth-token: ${TWILIO_AUTH_TOKEN:}
     from-number: ${TWILIO_FROM_NUMBER:}
   google-places:
     api-key: ${GOOGLE_PLACES_API_KEY:}
+  goong:
+    api-key: ${GOONG_API_KEY:}
+  serpapi:
+    api-key: ${SERPAPI_API_KEY:}
   gemini:
+    # Used by AI trip generation and post-trip album/storyboard generation.
+    # Enable real photo-aware AI Album generation with GEMINI_ANALYZE_PHOTOS=true
+    # and a valid GEMINI_API_KEY. When disabled or unavailable, metadata fallback is used.
+    analyze-photos: ${GEMINI_ANALYZE_PHOTOS:false}
     api-key: ${GEMINI_API_KEY:}
-    model: gemini-3.1-flash-lite
+    model: ${GEMINI_MODEL:gemini-3.1-flash-lite}
   rate-limit:
     enabled: true
 
@@ -101,3 +160,10 @@ management:
   endpoint:
     health:
       show-details: always
+
+logging:
+  level:
+    org.springframework.web.client.RestTemplate: INFO
+    org.springframework.web.client: INFO
+    org.springframework.web.HttpLogging: INFO
+    org.springframework.web: INFO

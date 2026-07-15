@@ -10,11 +10,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 
 @Slf4j
 public final class AiItineraryParser {
 
     private static final Pattern FENCE = Pattern.compile("^```(?:json)?\\s*|\\s*```$", Pattern.MULTILINE);
+    private static final Pattern METADATA_LINE = Pattern.compile(
+            "(?i)^\\s*(Coordinates|Time|Start\\s*time|Duration|Estimated\\s*cost|Cost|Image)\\s*:\\s*.*$"
+    );
 
     private AiItineraryParser() {}
 
@@ -68,34 +74,34 @@ public final class AiItineraryParser {
 
     public static double orderIdxFor(AiGeneratedStop stop) {
         int day = Math.max(1, stop.getDay());
-        int slot = switch (normalizeTimeOfDay(stop.getTimeOfDay())) {
-            case "MORNING" -> 100;
-            case "AFTERNOON" -> 200;
-            case "EVENING" -> 300;
-            case "NIGHT" -> 400;
-            default -> 150;
-        };
-        return day * 1000.0 + slot;
+        int minutes = minutesFromStartTime(stop.getStartTime());
+        if (minutes < 0) {
+            minutes = switch (normalizeTimeOfDay(stop.getTimeOfDay())) {
+                case "MORNING" -> 8 * 60;
+                case "AFTERNOON" -> 13 * 60;
+                case "EVENING", "NIGHT" -> 18 * 60;
+                default -> 9 * 60;
+            };
+        }
+        return day * 100000.0 + minutes;
     }
 
     public static String buildNotes(AiGeneratedStop stop) {
-        StringBuilder sb = new StringBuilder();
-        if (stop.getDescription() != null && !stop.getDescription().isBlank()) {
-            sb.append(stop.getDescription().trim());
+        String notes = cleanNaturalNotes(stop.getDescription());
+        return notes == null || notes.isBlank() ? null : notes;
+    }
+
+    public static String cleanNaturalNotes(String text) {
+        if (text == null || text.isBlank()) {
+            return null;
         }
-        if (stop.getLat() != null && stop.getLng() != null) {
-            if (!sb.isEmpty()) sb.append("\n");
-            sb.append("Coordinates: ").append(stop.getLat()).append(", ").append(stop.getLng());
-        }
-        if (stop.getTimeOfDay() != null && !stop.getTimeOfDay().isBlank()) {
-            if (!sb.isEmpty()) sb.append("\n");
-            sb.append("Time: ").append(stop.getTimeOfDay());
-        }
-        if (stop.getImageUrl() != null && !stop.getImageUrl().isBlank()) {
-            if (!sb.isEmpty()) sb.append("\n");
-            sb.append("Image: ").append(stop.getImageUrl());
-        }
-        return sb.isEmpty() ? null : sb.toString();
+        String cleaned = text.lines()
+                .map(String::trim)
+                .filter(line -> !line.isBlank())
+                .filter(line -> !METADATA_LINE.matcher(line).matches())
+                .reduce((left, right) -> left + "\n" + right)
+                .orElse("");
+        return cleaned.isBlank() ? null : cleaned;
     }
 
     private static String normalizeTimeOfDay(String timeOfDay) {
@@ -103,5 +109,17 @@ public final class AiItineraryParser {
             return "";
         }
         return timeOfDay.trim().toUpperCase(Locale.ROOT).replace(' ', '_');
+    }
+
+    private static int minutesFromStartTime(String startTime) {
+        if (startTime == null || startTime.isBlank()) {
+            return -1;
+        }
+        try {
+            LocalTime parsed = LocalTime.parse(startTime.trim(), DateTimeFormatter.ofPattern("HH:mm"));
+            return parsed.getHour() * 60 + parsed.getMinute();
+        } catch (DateTimeParseException e) {
+            return -1;
+        }
     }
 }

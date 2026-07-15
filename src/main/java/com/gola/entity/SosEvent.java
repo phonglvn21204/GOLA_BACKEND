@@ -26,6 +26,8 @@ public class SosEvent {
     @Builder.Default
     private SosStatus status = SosStatus.ACTIVE;
     @Column(name = "client_token", unique = true) private String clientToken;
+    @Column(name = "acknowledged_at") private Instant acknowledgedAt;
+    @Column(name = "acknowledged_by") private UUID acknowledgedBy;
     @Column(name = "resolved_at") private Instant resolvedAt;
     @Column(name = "resolved_by") private UUID resolvedBy;
     @CreatedDate @Column(name = "created_at", updatable = false) private Instant createdAt;

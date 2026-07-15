@@ -10,5 +10,8 @@ import java.util.UUID;
 @Repository
 public interface CommentRepository extends JpaRepository<Comment, UUID> {
     List<Comment> findByPostIdOrderByCreatedAtAsc(UUID postId);
+    List<Comment> findByPostIdAndHiddenFalseOrderByCreatedAtAsc(UUID postId);
     List<Comment> findByParentIdOrderByCreatedAtAsc(UUID parentId);
+    long countByPostId(UUID postId);
+    long countByPostIdAndHiddenFalse(UUID postId);
 }

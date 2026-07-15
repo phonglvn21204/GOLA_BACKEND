@@ -78,6 +78,9 @@ dependencies {
         exclude group: "io.jsonwebtoken"
     }
 
+    // Firebase Cloud Messaging
+    implementation 'com.google.firebase:firebase-admin:9.4.3'
+
     // Bucket4j
     implementation 'com.bucket4j:bucket4j-core:8.10.1'
 
@@ -88,6 +91,7 @@ dependencies {
     implementation 'org.apache.commons:commons-lang3:3.14.0'
     implementation 'com.google.guava:guava:33.2.1-jre'
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+    implementation 'org.apache.pdfbox:pdfbox:3.0.3'
 
     // Auth0 JWT (for Google OAuth verification)
     implementation 'com.auth0:java-jwt:4.4.0'

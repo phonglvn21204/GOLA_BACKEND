@@ -1,5 +1,15 @@
 package com.gola.entity.enums;
 
 public enum QuestProgressStatus {
-    NOT_STARTED, IN_PROGRESS, COMPLETED, FAILED
+    LOCKED,
+    AVAILABLE,
+    ASSIGNED,
+    NOT_STARTED,
+    IN_PROGRESS,
+    SUBMITTED,
+    APPROVED,
+    REJECTED,
+    COMPLETED,
+    FLAGGED,
+    FAILED
 }

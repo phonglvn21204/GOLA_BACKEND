@@ -11,4 +11,11 @@ import java.util.List;
     private List<String> interests;
     private String budget = "mid";
     private String language = "en";
+    private String departureTimePreference = "MORNING";
+    private String departureTime;
+    private String returnTimePreference = "AFTERNOON";
+    private String returnTime;
+    private Boolean needAccommodation;
+    private String accommodationPreference = "ANY";
+    private String transportPreference = "AUTO";
 }

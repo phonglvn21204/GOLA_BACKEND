@@ -48,7 +48,7 @@ public class AdminService {
 
     public Map<String, Object> getMetrics() {
         long totalUsers        = profileRepo.count();
-        long activeTrips       = tripRepo.countByStatusAndDeletedAtIsNull(TripStatus.ACTIVE);
+        long activeTrips       = tripRepo.countByStatusNameAndDeletedAtIsNull(TripStatus.ACTIVE.name());
         long openReports       = reportRepo.findByStatus("OPEN").size();
         Instant since7d        = Instant.now().minus(7, ChronoUnit.DAYS);
         long questCompletions  = questProgressRepo.countByStatusAndVerifiedAtAfter(
@@ -66,6 +66,39 @@ public class AdminService {
 
     public PageResponse<ProfileResponse> listUsers(Pageable pageable) {
         return new PageResponse<>(profileRepo.findAll(pageable).map(this::mapProfile));
+    }
+
+    @Transactional
+    public ProfileResponse blockUser(UUID targetUserId, UUID adminId, String reason) {
+        if (targetUserId.equals(adminId)) {
+            throw GolaException.badRequest("Admin cannot block their own account");
+        }
+        Profile target = profileRepo.findActiveById(targetUserId)
+                .orElseThrow(() -> GolaException.notFound("User"));
+        List<AppRole> targetRoles = userRoleRepo.findByProfile_Id(targetUserId).stream()
+                .map(UserRole::getRole)
+                .toList();
+        if (targetRoles.contains(AppRole.ADMIN)) {
+            throw GolaException.forbidden("Cannot block another admin account");
+        }
+        target.setBlocked(true);
+        target.setBlockedAt(Instant.now());
+        target.setBlockedBy(adminId);
+        target.setBlockReason(reason);
+        log.info("Admin {} blocked user {} reason={}", adminId, targetUserId, reason);
+        return mapProfile(profileRepo.save(target));
+    }
+
+    @Transactional
+    public ProfileResponse unblockUser(UUID targetUserId) {
+        Profile target = profileRepo.findActiveById(targetUserId)
+                .orElseThrow(() -> GolaException.notFound("User"));
+        target.setBlocked(false);
+        target.setBlockedAt(null);
+        target.setBlockedBy(null);
+        target.setBlockReason(null);
+        log.info("Admin unblocked user {}", targetUserId);
+        return mapProfile(profileRepo.save(target));
     }
 
     @Transactional
@@ -124,6 +157,14 @@ public class AdminService {
     // ── Mappers ───────────────────────────────────────────────────────────────
 
     private ProfileResponse mapProfile(Profile p) {
+        List<String> roles = userRoleRepo.findByProfile_Id(p.getId()).stream()
+                .map(UserRole::getRole)
+                .map(AppRole::name)
+                .distinct()
+                .toList();
+        if (roles.isEmpty()) {
+            roles = List.of(AppRole.USER.name());
+        }
         return ProfileResponse.builder()
                 .id(p.getId())
                 .email(p.getEmail())
@@ -132,6 +173,11 @@ public class AdminService {
                 .bio(p.getBio())
                 .isPublic(p.isPublic())
                 .emailVerified(p.isEmailVerified())
+                .roles(roles)
+                .isAdmin(roles.contains(AppRole.ADMIN.name()))
+                .isBlocked(p.isBlocked())
+                .blockedAt(p.getBlockedAt())
+                .blockReason(p.getBlockReason())
                 .onboardedAt(p.getOnboardedAt())
                 .createdAt(p.getCreatedAt())
                 .build();

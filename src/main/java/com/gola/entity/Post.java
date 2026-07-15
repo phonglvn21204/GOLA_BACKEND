@@ -20,6 +20,10 @@ public class Post {
     private String body;
     @JdbcTypeCode(SqlTypes.ARRAY) @Column(name = "media_urls", columnDefinition = "text[]")
     private String[] mediaUrls;
+    @JdbcTypeCode(SqlTypes.ARRAY) @Column(name = "thumbnail_urls", columnDefinition = "text[]")
+    private String[] thumbnailUrls;
+    @JdbcTypeCode(SqlTypes.ARRAY) @Column(name = "medium_urls", columnDefinition = "text[]")
+    private String[] mediumUrls;
     @Column(name = "trip_id") private UUID tripId;
     @Column(name = "is_hidden") private boolean isHidden;
     @CreatedDate @Column(name = "created_at", updatable = false) private Instant createdAt;

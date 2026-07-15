@@ -1,5 +1,7 @@
 package com.gola.dto.trip;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
@@ -13,5 +15,7 @@ public class CreateTripRequest {
     private LocalDate startDate;
     private LocalDate endDate;
     private String description;
+    @JsonProperty("isPublic")
+    @JsonAlias("public")
     private boolean isPublic = false;
 }

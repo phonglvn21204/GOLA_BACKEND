@@ -1,2 +1,2 @@
 package com.gola.entity.enums;
-public enum SosStatus { ACTIVE, RESOLVED, FALSE_ALARM }
+public enum SosStatus { ACTIVE, ACKNOWLEDGED, RESOLVED, FALSE_ALARM }

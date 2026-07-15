@@ -3,6 +3,7 @@ package com.gola.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -32,14 +33,78 @@ public class TripStop {
     @Column(name = "duration_min")
     private Integer durationMin;
 
+    @Column(name = "estimated_cost", precision = 12, scale = 2)
+    private BigDecimal estimatedCost;
+
+    @Column(name = "category", length = 50)
+    private String category;
+
+    @Column(columnDefinition = "TEXT")
     private String notes;
 
     private Double lat;
 
     private Double lng;
 
-    @Column(name = "image_url")
+    @Column(name = "image_url", columnDefinition = "TEXT")
     private String imageUrl;
+
+    @Column(name = "rating", precision = 3, scale = 2)
+    private BigDecimal rating;
+
+    @Column(name = "review_count")
+    private Integer reviewCount;
+
+    @Column(name = "image_source", length = 100)
+    private String imageSource;
+
+    @Column(name = "place_address", columnDefinition = "TEXT")
+    private String placeAddress;
+
+    @Column(name = "data_source", length = 100)
+    private String dataSource;
+
+    @Column(name = "enrichment_status", length = 100)
+    private String enrichmentStatus;
+
+    @Column(name = "has_real_photo")
+    private Boolean hasRealPhoto;
+
+    @Column(name = "has_real_coordinates")
+    private Boolean hasRealCoordinates;
+
+    @Column(name = "has_opening_hours")
+    private Boolean hasOpeningHours;
+
+    @Column(name = "opening_hours_text", columnDefinition = "TEXT")
+    private String openingHoursText;
+
+    @Column(name = "open_now")
+    private Boolean openNow;
+
+    @Column(name = "business_status", length = 100)
+    private String businessStatus;
+
+    @Column(name = "next_open_close_text", columnDefinition = "TEXT")
+    private String nextOpenCloseText;
+
+    @Column(name = "scheduled_open_status", length = 100)
+    private String scheduledOpenStatus;
+
+    @Column(name = "place_data_reject_reason", columnDefinition = "TEXT")
+    private String placeDataRejectReason;
+
+    @Column(name = "provider_title", columnDefinition = "TEXT")
+    private String providerTitle;
+
+    @Column(name = "provider_id", columnDefinition = "TEXT")
+    private String providerId;
+
+    @Column(name = "provider_source", length = 100)
+    private String providerSource;
+
+    @Column(name = "system_stop")
+    private Boolean systemStop;
 
     @Column(name = "completed_at")
     private Instant completedAt;

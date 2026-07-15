@@ -25,10 +25,22 @@ public class TripResponse {
     private int membersCount;
     private Instant createdAt;
     private Instant updatedAt;
+    private Instant completedAt;
     private List<TripStopResponse> stops;
     private List<TripMemberResponse> members;
     private Double totalDistanceKm;
     private Integer totalTravelTimeMin;
     private Double distanceFromUserKm;
     private Integer travelTimeFromUserMin;
+    private Integer questCompletedCount;
+    private UUID memoryId;
+    private String memoryStatus;
+    private String memoryShareStatus;
+    private String memorySummary;
+    private String albumStatus;
+    private String bookStatus;
+    private String bookDownloadUrl;
+    private String reelStatus;
+    private Integer qualityScore;
+    private String qualityWarning;
 }

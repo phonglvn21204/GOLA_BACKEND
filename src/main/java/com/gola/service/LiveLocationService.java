@@ -10,6 +10,7 @@ import com.gola.repository.TripMemberRepository;
 import com.gola.repository.TripSessionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +27,7 @@ public class LiveLocationService {
     private final LiveLocationRepository  locationRepo;
     private final TripSessionRepository   sessionRepo;
     private final TripMemberRepository    memberRepo;
+    private final SimpMessagingTemplate   messaging;
 
     @Transactional
     public LiveLocationResponse ping(UUID sessionId, UUID userId, LiveLocationRequest req) {
@@ -62,8 +64,11 @@ public class LiveLocationService {
                 .ts(ts)
                 .build();
 
+        LiveLocationResponse response = toResponse(loc);
+        messaging.convertAndSend("/topic/live/" + sessionId, response);
+
         log.debug("Location ping: user={} session={} lat={} lng={}", userId, sessionId, req.getLat(), req.getLng());
-        return toResponse(loc);
+        return response;
     }
 
     public List<LiveLocationResponse> getLatestLocations(UUID sessionId, UUID userId) {

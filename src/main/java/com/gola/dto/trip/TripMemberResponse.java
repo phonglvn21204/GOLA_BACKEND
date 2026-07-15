@@ -10,6 +10,7 @@ public class TripMemberResponse {
     private UUID userId;
     private String displayName;
     private String avatarUrl;
+    private String phone;
     private MemberRole role;
     private Instant joinedAt;
 }

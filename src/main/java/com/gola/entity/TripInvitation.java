@@ -26,6 +26,9 @@ public class TripInvitation extends BaseEntity {
     @Column(name = "user_id")
     private UUID userId;
 
+    @Column(name = "created_by", nullable = false)
+    private UUID createdBy;
+
     @Column(nullable = false, unique = true)
     private String token;
 

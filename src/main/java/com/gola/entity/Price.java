@@ -13,7 +13,7 @@ public class Price {
     @Column(name = "product_id", nullable = false) private UUID productId;
     @Column(name = "stripe_price_id", nullable = false, unique = true) private String stripePriceId;
     @Column(nullable = false) private long amount;
-    @Column(nullable = false) @Builder.Default private String currency = "usd";
+    @Column(nullable = false) @Builder.Default private String currency = "vnd";
     @Column(name = "interval_type") private String intervalType;
     @Column(name = "interval_count") @Builder.Default private Integer intervalCount = 1;
     @Column(name = "is_active", nullable = false) @Builder.Default private boolean isActive = true;

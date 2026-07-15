@@ -63,6 +63,19 @@ public class Profile {
     @Column(name = "deleted_at")
     private Instant deletedAt;
 
+    @Builder.Default
+    @Column(name = "is_blocked", nullable = false)
+    private boolean isBlocked = false;
+
+    @Column(name = "blocked_at")
+    private Instant blockedAt;
+
+    @Column(name = "blocked_by")
+    private UUID blockedBy;
+
+    @Column(name = "block_reason", columnDefinition = "TEXT")
+    private String blockReason;
+
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private Instant createdAt;

@@ -11,8 +11,12 @@ public class SubscriptionResponse {
     private UUID priceId;
     private String productName;
     private SubStatus status;
+    private Instant startDate;
+    private Instant endDate;
     private Instant currentPeriodStart;
     private Instant currentPeriodEnd;
+    private long daysRemaining;
+    private boolean expired;
     private boolean cancelAtPeriodEnd;
     private Instant cancelledAt;
     private Instant createdAt;

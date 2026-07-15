@@ -7,6 +7,7 @@ import com.gola.dto.safety.IncidentResponse;
 import com.gola.dto.user.ProfileResponse;
 import com.gola.entity.SosEvent;
 import com.gola.entity.enums.AppRole;
+import com.gola.security.SecurityUtils;
 import com.gola.service.AdminService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -56,6 +57,21 @@ public class AdminController {
             @RequestBody ChangeRoleRequest req) {
         adminService.changeUserRole(id, req.getRole());
         return ResponseEntity.ok(ApiResponse.ok("Role updated", null));
+    }
+
+    @PatchMapping("/users/{id}/block")
+    @Operation(summary = "Block a user account")
+    public ResponseEntity<ApiResponse<ProfileResponse>> blockUser(
+            @PathVariable UUID id,
+            @RequestBody(required = false) BlockUserRequest req) {
+        return ResponseEntity.ok(ApiResponse.ok("User blocked",
+                adminService.blockUser(id, SecurityUtils.getCurrentUserId(), req != null ? req.getReason() : null)));
+    }
+
+    @PatchMapping("/users/{id}/unblock")
+    @Operation(summary = "Unblock a user account")
+    public ResponseEntity<ApiResponse<ProfileResponse>> unblockUser(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.ok("User unblocked", adminService.unblockUser(id)));
     }
 
     // ── Incidents ─────────────────────────────────────────────────────────────
@@ -108,6 +124,11 @@ public class AdminController {
     static class ChangeRoleRequest {
         @NotNull
         private AppRole role;
+    }
+
+    @Data
+    static class BlockUserRequest {
+        private String reason;
     }
 
     @Data

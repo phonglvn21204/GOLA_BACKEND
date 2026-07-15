@@ -19,6 +19,9 @@ public class GolaException extends RuntimeException {
     public static GolaException forbidden() {
         return new GolaException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Access denied");
     }
+    public static GolaException forbidden(String msg) {
+        return new GolaException(HttpStatus.FORBIDDEN, "FORBIDDEN", msg);
+    }
     public static GolaException badRequest(String msg) {
         return new GolaException(HttpStatus.BAD_REQUEST, "BAD_REQUEST", msg);
     }

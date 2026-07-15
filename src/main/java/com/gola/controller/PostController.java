@@ -38,7 +38,7 @@ public class PostController {
     public ResponseEntity<ApiResponse<PageResponse<PostResponse>>> getFeed(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return ResponseEntity.ok(ApiResponse.ok(postService.getFeed(page, size)));
+        return ResponseEntity.ok(ApiResponse.ok(postService.getFeed(SecurityUtils.getCurrentUserId(), page, size)));
     }
 
     @GetMapping("/trip-stories")
@@ -46,7 +46,7 @@ public class PostController {
     public ResponseEntity<ApiResponse<PageResponse<PostResponse>>> getTripStories(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return ResponseEntity.ok(ApiResponse.ok(postService.getFeed(page, size)));
+        return ResponseEntity.ok(ApiResponse.ok(postService.getFeed(SecurityUtils.getCurrentUserId(), page, size)));
     }
 
     @GetMapping("/hashtag/{tag}")
@@ -55,20 +55,29 @@ public class PostController {
             @PathVariable String tag,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return ResponseEntity.ok(ApiResponse.ok(postService.getPostsByHashtag(tag, page, size)));
+        return ResponseEntity.ok(ApiResponse.ok(postService.getPostsByHashtag(tag, SecurityUtils.getCurrentUserId(), page, size)));
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Get post details")
     public ResponseEntity<ApiResponse<PostResponse>> getPostById(@PathVariable UUID id) {
-        return ResponseEntity.ok(ApiResponse.ok(postService.getPostById(id)));
+        return ResponseEntity.ok(ApiResponse.ok(postService.getPostById(id, SecurityUtils.getCurrentUserId(), SecurityUtils.hasRole("ADMIN"))));
+    }
+
+    @PatchMapping("/{id}")
+    @Operation(summary = "Update a post")
+    public ResponseEntity<ApiResponse<PostResponse>> updatePost(
+            @PathVariable UUID id,
+            @Valid @RequestBody CreatePostRequest req) {
+        return ResponseEntity.ok(ApiResponse.ok("Post updated",
+            postService.updatePost(id, SecurityUtils.getCurrentUserId(), req)));
     }
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete a post")
     public ResponseEntity<ApiResponse<Void>> deletePost(@PathVariable UUID id) {
         var userId = SecurityUtils.getCurrentUserId();
-        postService.deletePost(id, userId);
+        postService.deletePost(id, userId, SecurityUtils.hasRole("ADMIN"));
         return ResponseEntity.ok(ApiResponse.ok("Post deleted successfully", null));
     }
 

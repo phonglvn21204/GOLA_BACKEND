@@ -37,6 +37,27 @@ public class GeminiClient {
     }
 
     public String generateContent(String prompt) {
+        return generateContentWithParts(List.of(Map.of("text", prompt)));
+    }
+
+    public String generateContentWithImages(String prompt, List<InlineImagePart> images) {
+        var parts = new java.util.ArrayList<Map<String, Object>>();
+        parts.add(Map.of("text", prompt));
+        for (InlineImagePart image : images) {
+            if (image == null || image.dataBase64() == null || image.dataBase64().isBlank()) {
+                continue;
+            }
+            parts.add(Map.of(
+                "inline_data", Map.of(
+                    "mime_type", image.mimeType() == null || image.mimeType().isBlank() ? MediaType.IMAGE_JPEG_VALUE : image.mimeType(),
+                    "data", image.dataBase64()
+                )
+            ));
+        }
+        return generateContentWithParts(parts);
+    }
+
+    private String generateContentWithParts(List<Map<String, Object>> parts) {
         var gemini = properties.getGemini();
         String apiKey = gemini.getApiKey();
         if (apiKey == null || apiKey.isBlank()) {
@@ -45,13 +66,13 @@ public class GeminiClient {
 
         String model = gemini.getModel() != null && !gemini.getModel().isBlank()
             ? gemini.getModel()
-            : "gemini-2.5-flash";
+            : GolaProperties.DEFAULT_GEMINI_MODEL;
 
         String url = BASE_URL + "/models/" + model + ":generateContent?key=" + apiKey;
 
         var body = Map.of(
             "contents", List.of(
-                Map.of("parts", List.of(Map.of("text", prompt)))
+                Map.of("parts", parts)
             )
         );
 
@@ -63,13 +84,20 @@ public class GeminiClient {
             ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
             return extractText(response.getBody());
         } catch (RestClientResponseException e) {
-            log.error("Gemini API error status={} body={}", e.getStatusCode(), e.getResponseBodyAsString());
-            throw GolaException.badRequest("Gemini API error: " + summarizeError(e.getResponseBodyAsString()));
+            String error = summarizeError(e.getResponseBodyAsString());
+            log.error("Gemini API error status={} model={} error={}", e.getStatusCode(), model, error);
+            if (isModelNotFound(error)) {
+                throw GolaException.badRequest("Gemini model is unavailable or not supported for generateContent: " + model);
+            }
+            throw GolaException.badRequest("Gemini API error: " + error);
         } catch (Exception e) {
-            log.error("Gemini API call failed", e);
-            throw GolaException.badRequest("Gemini API call failed: " + e.getMessage());
+            String safeError = safeProviderError(e);
+            log.error("Gemini API call failed: {}", safeError);
+            throw GolaException.badRequest("Gemini API call failed: " + safeError);
         }
     }
+
+    public record InlineImagePart(String mimeType, String dataBase64) {}
 
     private String extractText(String responseBody) {
         if (responseBody == null || responseBody.isBlank()) {
@@ -114,5 +142,24 @@ public class GeminiClient {
             // ignore parse errors
         }
         return body.length() > 200 ? body.substring(0, 200) + "..." : body;
+    }
+
+    private boolean isModelNotFound(String error) {
+        if (error == null) {
+            return false;
+        }
+        String lower = error.toLowerCase();
+        return lower.contains("not found")
+            || lower.contains("not supported for generatecontent")
+            || lower.contains("model") && lower.contains("generatecontent");
+    }
+
+    private String safeProviderError(Exception e) {
+        String message = e.getMessage();
+        if (message == null || message.isBlank()) return e.getClass().getSimpleName();
+        return message
+                .replaceAll("(?i)(key=)[^&\\s\\\"]+", "$1***")
+                .replaceAll("(?i)(api_key=)[^&\\s\\\"]+", "$1***")
+                .replaceAll("https://generativelanguage\\.googleapis\\.com/[^\\s\\\"]+", "https://generativelanguage.googleapis.com/***");
     }
 }

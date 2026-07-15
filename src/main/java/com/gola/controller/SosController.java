@@ -33,6 +33,13 @@ public class SosController {
         return ResponseEntity.ok(ApiResponse.ok("SOS resolved", null));
     }
 
+    @PostMapping("/{sosId}/acknowledge")
+    @Operation(summary = "Acknowledge SOS event")
+    public ResponseEntity<ApiResponse<SosResponse>> acknowledge(@PathVariable UUID sosId) {
+        return ResponseEntity.ok(ApiResponse.ok("SOS acknowledged",
+                sosService.acknowledge(sosId, SecurityUtils.getCurrentUserId())));
+    }
+
     @GetMapping("/active")
     @Operation(summary = "List active SOS events")
     public ResponseEntity<ApiResponse<List<SosResponse>>> active() {

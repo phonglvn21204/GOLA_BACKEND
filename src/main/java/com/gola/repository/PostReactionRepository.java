@@ -12,5 +12,7 @@ import java.util.UUID;
 public interface PostReactionRepository extends JpaRepository<PostReaction, UUID> {
     List<PostReaction> findByPostId(UUID postId);
     Optional<PostReaction> findByPostIdAndUserId(UUID postId, UUID userId);
+    List<PostReaction> findAllByPostIdAndUserId(UUID postId, UUID userId);
+    void deleteByPostIdAndUserId(UUID postId, UUID userId);
     int countByPostId(UUID postId);
 }

@@ -38,4 +38,20 @@ public class CommentController {
             @PathVariable UUID postId) {
         return ResponseEntity.ok(ApiResponse.ok(commentService.getCommentsForPost(postId)));
     }
+
+    @PatchMapping("/{commentId}")
+    @Operation(summary = "Update a comment")
+    public ResponseEntity<ApiResponse<CommentResponse>> updateComment(
+            @PathVariable UUID commentId,
+            @Valid @RequestBody PostCommentRequest req) {
+        return ResponseEntity.ok(ApiResponse.ok("Comment updated",
+                commentService.updateComment(commentId, SecurityUtils.getCurrentUserId(), req)));
+    }
+
+    @DeleteMapping("/{commentId}")
+    @Operation(summary = "Delete a comment")
+    public ResponseEntity<ApiResponse<Void>> deleteComment(@PathVariable UUID commentId) {
+        commentService.deleteComment(commentId, SecurityUtils.getCurrentUserId(), SecurityUtils.hasRole("ADMIN"));
+        return ResponseEntity.ok(ApiResponse.ok("Comment deleted", null));
+    }
 }

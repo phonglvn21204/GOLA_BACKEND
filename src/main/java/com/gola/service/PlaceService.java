@@ -1,24 +1,50 @@
 package com.gola.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.gola.config.GolaProperties;
+import com.gola.dto.map.AutocompleteSuggestion;
+import com.gola.dto.map.PlaceDetail;
 import com.gola.dto.map.PlaceResponse;
 import com.gola.entity.Place;
 import com.gola.exception.GolaException;
 import com.gola.repository.PlaceRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class PlaceService {
     private final PlaceRepository placeRepo;
+    private final RestTemplate goongRestTemplate;
+    private final RestTemplate nominatimRestTemplate;
+    private final GolaProperties properties;
+    private final PlaceEnrichmentService placeEnrichmentService;
+
+    public PlaceService(
+            PlaceRepository placeRepo,
+            @Qualifier("goongRestTemplate") RestTemplate goongRestTemplate,
+            @Qualifier("nominatimRestTemplate") RestTemplate nominatimRestTemplate,
+            GolaProperties properties,
+            PlaceEnrichmentService placeEnrichmentService) {
+        this.placeRepo = placeRepo;
+        this.goongRestTemplate = goongRestTemplate;
+        this.nominatimRestTemplate = nominatimRestTemplate;
+        this.properties = properties;
+        this.placeEnrichmentService = placeEnrichmentService;
+    }
 
     public List<PlaceResponse> searchPlaces(String query, Double lat, Double lng) {
         return placeRepo.searchLocalPlaces(query, lat, lng).stream()
@@ -30,6 +56,94 @@ public class PlaceService {
         var place = placeRepo.findById(id)
             .orElseThrow(() -> GolaException.notFound("Place"));
         return mapToResponse(place);
+    }
+
+    public List<AutocompleteSuggestion> searchAutocomplete(String input) {
+        if (input == null || input.isBlank()) return List.of();
+
+        try {
+            String apiKey = properties.getGoong().getApiKey();
+            if (apiKey == null || apiKey.isBlank()) {
+                throw new IllegalStateException("GOONG_API_KEY is not configured");
+            }
+
+            String url = UriComponentsBuilder
+                    .fromHttpUrl("https://rsapi.goong.io/Place/AutoComplete")
+                    .queryParam("input", input)
+                    .queryParam("api_key", apiKey)
+                    .build()
+                    .toUriString();
+
+            ResponseEntity<JsonNode> response = goongRestTemplate.getForEntity(url, JsonNode.class);
+            JsonNode predictions = response.getBody() != null ? response.getBody().path("predictions") : null;
+            if (predictions == null || !predictions.isArray()) return List.of();
+
+            List<AutocompleteSuggestion> suggestions = new ArrayList<>();
+            for (JsonNode prediction : predictions) {
+                String placeId = prediction.path("place_id").asText(null);
+                String description = prediction.path("description").asText(null);
+                if (placeId != null && description != null) {
+                    suggestions.add(AutocompleteSuggestion.builder()
+                            .placeId(placeId)
+                            .description(description)
+                            .build());
+                }
+            }
+            return suggestions;
+        } catch (Exception e) {
+            log.warn("Goong autocomplete failed for '{}': {}", input, safeProviderError(e));
+            return searchNominatimAutocomplete(input);
+        }
+    }
+
+    public PlaceDetail getPlaceDetail(String placeId) {
+        if (placeId == null || placeId.isBlank()) {
+            throw GolaException.badRequest("placeId is required");
+        }
+
+        if (placeId.startsWith("nominatim:")) {
+            return decodeNominatimPlaceDetail(placeId);
+        }
+
+        try {
+            String apiKey = properties.getGoong().getApiKey();
+            if (apiKey == null || apiKey.isBlank()) {
+                throw new IllegalStateException("GOONG_API_KEY is not configured");
+            }
+
+            String url = UriComponentsBuilder
+                    .fromHttpUrl("https://rsapi.goong.io/Place/Detail")
+                    .queryParam("place_id", placeId)
+                    .queryParam("api_key", apiKey)
+                    .build()
+                    .toUriString();
+
+            ResponseEntity<JsonNode> response = goongRestTemplate.getForEntity(url, JsonNode.class);
+            JsonNode result = response.getBody() != null ? response.getBody().path("result") : null;
+            JsonNode location = result != null ? result.path("geometry").path("location") : null;
+            Double lat = coordinateOrNull(location != null ? location.path("lat").asText(null) : null);
+            Double lng = coordinateOrNull(location != null ? location.path("lng").asText(null) : null);
+            if (lat == null || lng == null) {
+                throw new IllegalStateException("Goong detail response missing coordinates");
+            }
+
+            return PlaceDetail.builder()
+                    .name(result.path("name").asText(null))
+                    .address(result.path("formatted_address").asText(result.path("description").asText(null)))
+                    .lat(lat)
+                    .lng(lng)
+                    .dataSource("GOONG")
+                    .enrichmentStatus("PARTIAL_WITH_COORDINATES")
+                    .hasRealCoordinates(true)
+                    .hasRealPhoto(false)
+                    .hasOpeningHours(false)
+                    .build();
+        } catch (Exception e) {
+            log.warn("Goong place detail failed for '{}': {}", placeId, safeProviderError(e));
+            PlaceDetail fallback = placeEnrichmentService.enrich(placeId, "Vietnam");
+            if (fallback != null) return fallback;
+            throw GolaException.notFound("Place detail");
+        }
     }
 
     @Transactional
@@ -69,5 +183,96 @@ public class PlaceService {
             .refreshedAt(p.getRefreshedAt())
             .createdAt(p.getCreatedAt())
             .build();
+    }
+
+    private List<AutocompleteSuggestion> searchNominatimAutocomplete(String input) {
+        try {
+            String url = UriComponentsBuilder
+                    .fromHttpUrl("https://nominatim.openstreetmap.org/search")
+                    .queryParam("q", input)
+                    .queryParam("format", "json")
+                    .queryParam("limit", "5")
+                    .queryParam("countrycodes", "vn")
+                    .queryParam("addressdetails", "1")
+                    .build()
+                    .toUriString();
+
+            ResponseEntity<JsonNode[]> response = nominatimRestTemplate.getForEntity(url, JsonNode[].class);
+            JsonNode[] body = response.getBody();
+            if (body == null || body.length == 0) return List.of();
+
+            List<AutocompleteSuggestion> suggestions = new ArrayList<>();
+            for (JsonNode node : body) {
+                String displayName = node.path("display_name").asText(null);
+                Double lat = coordinateOrNull(node.path("lat").asText(null));
+                Double lng = coordinateOrNull(node.path("lon").asText(null));
+                if (displayName == null || lat == null || lng == null) continue;
+
+                suggestions.add(AutocompleteSuggestion.builder()
+                        .placeId(encodeNominatimPlaceId(displayName, lat, lng))
+                        .description(displayName)
+                        .build());
+            }
+            return suggestions;
+        } catch (Exception e) {
+            log.warn("Nominatim autocomplete fallback failed for '{}': {}", input, e.getMessage());
+            return List.of();
+        }
+    }
+
+    private String encodeNominatimPlaceId(String displayName, double lat, double lng) {
+        String raw = lat + "\n" + lng + "\n" + displayName;
+        return "nominatim:" + Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(raw.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private PlaceDetail decodeNominatimPlaceDetail(String placeId) {
+        try {
+            String encoded = placeId.substring("nominatim:".length());
+            String raw = new String(Base64.getUrlDecoder().decode(encoded), StandardCharsets.UTF_8);
+            String[] parts = raw.split("\n", 3);
+            Double lat = parts.length > 0 ? coordinateOrNull(parts[0]) : null;
+            Double lng = parts.length > 1 ? coordinateOrNull(parts[1]) : null;
+            String address = parts.length > 2 ? parts[2] : null;
+            if (lat == null || lng == null) {
+                throw new IllegalArgumentException("Invalid Nominatim placeId");
+            }
+            return PlaceDetail.builder()
+                    .name(address != null ? address.split(",")[0].trim() : null)
+                    .address(address)
+                    .lat(lat)
+                    .lng(lng)
+                    .dataSource("NOMINATIM")
+                    .enrichmentStatus("PARTIAL_WITH_COORDINATES")
+                    .hasRealCoordinates(true)
+                    .hasRealPhoto(false)
+                    .hasOpeningHours(false)
+                    .build();
+        } catch (Exception e) {
+            log.warn("Invalid Nominatim fallback placeId: {}", e.getMessage());
+            throw GolaException.notFound("Place detail");
+        }
+    }
+
+    private Double coordinateOrNull(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        try {
+            double value = Double.parseDouble(raw);
+            return value == 0.0 ? null : value;
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private String safeProviderError(Exception e) {
+        String message = e.getMessage();
+        if (message == null || message.isBlank()) return e.getClass().getSimpleName();
+        return message
+                .replaceAll("(?i)(api_key=)[^&\\s\\\"]+", "$1***")
+                .replaceAll("(?i)(key=)[^&\\s\\\"]+", "$1***")
+                .replaceAll("(?i)(access_token=)[^&\\s\\\"]+", "$1***")
+                .replaceAll("(?i)(token=)[^&\\s\\\"]+", "$1***")
+                .replaceAll("https://rsapi\\.goong\\.io/[^\\s\\\"]+", "https://rsapi.goong.io/***");
     }
 }

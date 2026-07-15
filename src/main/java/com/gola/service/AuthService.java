@@ -25,7 +25,9 @@ import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 @Slf4j
 @Service
@@ -67,6 +69,7 @@ public class AuthService {
         var profile = profileRepo.findByEmail(req.getEmail().toLowerCase())
             .orElseThrow(() -> GolaException.unauthorized("Email or password is incorrect"));
         if (profile.isDeleted()) throw GolaException.unauthorized("Account deactivated");
+        ensureNotBlocked(profile);
         
         // Validate password if stored
         if (profile.getPasswordHash() != null && !encoder.matches(req.getPassword(), profile.getPasswordHash())) {
@@ -77,10 +80,8 @@ public class AuthService {
             throw GolaException.unauthorized("Please verify your email before login");
         }
         
-        var role = roleRepo.findByProfile_Id(profile.getId()).stream()
-            .map(UserRole::getRole).findFirst().orElse(AppRole.USER);
         log.info("User logged in: {}", profile.getEmail());
-        return buildAuthResponse(profile, role);
+        return buildAuthResponse(profile, resolveRoles(profile));
     }
 
     @Transactional
@@ -92,9 +93,8 @@ public class AuthService {
         stored.setRevokedAt(Instant.now());
         tokenRepo.save(stored);
         var profile = stored.getProfile();
-        var role = roleRepo.findByProfile_Id(profile.getId()).stream()
-            .map(UserRole::getRole).findFirst().orElse(AppRole.USER);
-        return buildAuthResponse(profile, role);
+        ensureNotBlocked(profile);
+        return buildAuthResponse(profile, resolveRoles(profile));
     }
 
     @Transactional
@@ -179,8 +179,15 @@ public class AuthService {
     }
 
     public AuthResponse buildAuthResponse(Profile profile, AppRole role) {
+        return buildAuthResponse(profile, List.of(role));
+    }
+
+    public AuthResponse buildAuthResponse(Profile profile, List<AppRole> roles) {
+        ensureNotBlocked(profile);
+        List<AppRole> resolvedRoles = normalizeRoles(roles);
+        AppRole primaryRole = primaryRole(resolvedRoles);
         tokenRepo.revokeAllByUserId(profile.getId(), Instant.now());
-        String accessToken  = jwtService.generateAccessToken(profile.getId(), profile.getEmail(), role.name());
+        String accessToken  = jwtService.generateAccessToken(profile.getId(), profile.getEmail(), primaryRole.name());
         String refreshToken = jwtService.generateRefreshToken(profile.getId());
         tokenRepo.save(RefreshToken.builder()
             .profile(profile)
@@ -196,10 +203,38 @@ public class AuthService {
                 .email(profile.getEmail())
                 .displayName(profile.getDisplayName())
                 .avatarUrl(profile.getAvatarUrl())
-                .role(role.name())
+                .role(primaryRole.name())
+                .roles(resolvedRoles.stream().map(AppRole::name).toList())
+                .isAdmin(resolvedRoles.contains(AppRole.ADMIN))
                 .emailVerified(profile.isEmailVerified())
                 .build())
             .build();
+    }
+
+    public List<AppRole> resolveRoles(Profile profile) {
+        return normalizeRoles(roleRepo.findByProfile_Id(profile.getId()).stream()
+            .map(UserRole::getRole)
+            .toList());
+    }
+
+    private List<AppRole> normalizeRoles(List<AppRole> roles) {
+        List<AppRole> resolvedRoles = (roles == null ? Stream.<AppRole>empty() : roles.stream())
+            .filter(role -> role != null)
+            .distinct()
+            .toList();
+        return resolvedRoles.isEmpty() ? List.of(AppRole.USER) : resolvedRoles;
+    }
+
+    private AppRole primaryRole(List<AppRole> roles) {
+        if (roles.contains(AppRole.ADMIN)) return AppRole.ADMIN;
+        if (roles.contains(AppRole.MODERATOR)) return AppRole.MODERATOR;
+        return roles.get(0);
+    }
+
+    private void ensureNotBlocked(Profile profile) {
+        if (profile.isBlocked()) {
+            throw GolaException.forbidden("Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên.");
+        }
     }
 
     private String hashToken(String raw) {

@@ -20,7 +20,7 @@ public class OpenApiConfig {
             .info(new Info()
                 .title("GOLA Backend API")
                 .version("1.0.0")
-                .description("AI-Powered Travel Platform â€” Production API")
+                .description("AI-Powered Travel Platform — Production API")
                 .contact(new Contact().name("GOLA Team").email("dev@gola.app"))
                 .license(new License().name("Proprietary")))
             .addSecurityItem(new SecurityRequirement().addList(securitySchemeName))

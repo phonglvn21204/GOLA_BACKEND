@@ -11,6 +11,8 @@ import java.util.UUID;
 @Repository
 public interface UserBadgeRepository extends JpaRepository<UserBadge, UUID> {
     List<UserBadge> findByUserId(UUID userId);
+    List<UserBadge> findTop6ByUserIdOrderByEarnedAtDesc(UUID userId);
     Optional<UserBadge> findByUserIdAndBadgeId(UUID userId, UUID badgeId);
     boolean existsByUserIdAndBadgeId(UUID userId, UUID badgeId);
+    long countByUserId(UUID userId);
 }

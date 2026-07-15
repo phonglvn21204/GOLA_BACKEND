@@ -9,4 +9,6 @@ import java.util.UUID;
 public interface OrderRepository extends JpaRepository<Order, UUID> {
     List<Order> findByUserIdOrderByCreatedAtDesc(UUID userId);
     Optional<Order> findByIdAndUserId(UUID id, UUID userId);
+    Optional<Order> findFirstByOrderCodeIgnoreCaseOrTransferContentIgnoreCase(String orderCode, String transferContent);
+    boolean existsByOrderCodeIgnoreCaseOrTransferContentIgnoreCase(String orderCode, String transferContent);
 }

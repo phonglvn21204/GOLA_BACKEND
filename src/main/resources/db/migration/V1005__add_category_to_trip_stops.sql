@@ -1,0 +1,2 @@
+ALTER TABLE trip_stops
+    ADD COLUMN IF NOT EXISTS category VARCHAR(40);

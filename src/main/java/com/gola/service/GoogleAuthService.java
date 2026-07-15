@@ -62,13 +62,12 @@ public class GoogleAuthService {
         if (profile.isDeleted()) {
             throw GolaException.unauthorized("Account deactivated");
         }
-
-        // Get user role
-        var role = roleRepo.findByProfile_Id(profile.getId()).stream()
-            .map(UserRole::getRole).findFirst().orElse(AppRole.USER);
+        if (profile.isBlocked()) {
+            throw GolaException.forbidden("Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên.");
+        }
 
         log.info("User logged in with Google: {}", profile.getEmail());
-        return authService.buildAuthResponse(profile, role);
+        return authService.buildAuthResponse(profile, authService.resolveRoles(profile));
     }
 
     private boolean isJwt(String token) {
