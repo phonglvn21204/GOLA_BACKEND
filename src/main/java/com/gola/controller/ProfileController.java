@@ -5,6 +5,7 @@ import com.gola.dto.user.ProfileResponse;
 import com.gola.dto.user.UpdateProfileRequest;
 import com.gola.security.SecurityUtils;
 import com.gola.service.ProfileService;
+import com.gola.service.R2StorageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -32,6 +33,7 @@ public class ProfileController {
     private static final long AVATAR_MAX_BYTES = 5L * 1024 * 1024;
 
     private final ProfileService profileService;
+    private final R2StorageService r2StorageService;
 
     @GetMapping("/me")
     @Operation(summary = "Get my own profile")
@@ -112,19 +114,12 @@ public class ProfileController {
 
         String ext = extensionFrom(original, contentType);
         String fileName = UUID.randomUUID() + ext;
-        Path root = Path.of("uploads", "avatars").toAbsolutePath().normalize();
-        Path dir = root.resolve(userId.toString()).normalize();
-        Path target = dir.resolve(fileName).normalize();
-        if (!target.startsWith(root)) {
-            throw com.gola.exception.GolaException.badRequest("Invalid upload path");
-        }
+        String key = "avatars/" + userId + "/" + fileName;
         try {
-            Files.createDirectories(dir);
-            Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+            return r2StorageService.uploadFile(key, file.getInputStream(), contentType, file.getSize());
         } catch (IOException ex) {
             throw com.gola.exception.GolaException.badRequest("Could not store avatar image");
         }
-        return "/api/uploads/avatars/" + userId + "/" + fileName;
     }
 
     private boolean isSupportedImage(String fileName, String contentType) {

@@ -9,6 +9,7 @@ import com.gola.entity.enums.IncidentType;
 import com.gola.security.SecurityUtils;
 import com.gola.service.IncidentAiService;
 import com.gola.service.IncidentService;
+import com.gola.service.R2StorageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,7 @@ import java.util.UUID;
 public class TripIncidentController {
     private final IncidentService incidentService;
     private final IncidentAiService incidentAiService;
+    private final R2StorageService r2StorageService;
 
     @GetMapping
     @Operation(summary = "Get incident history for a trip")
@@ -83,20 +85,10 @@ public class TripIncidentController {
         if (contentType == null || !contentType.toLowerCase().startsWith("image/")) {
             throw new IllegalArgumentException("Incident photo must be an image.");
         }
-        Path root = Path.of("uploads", "community-media").toAbsolutePath().normalize();
-        Path userDir = root.resolve(userId.toString()).normalize();
-        if (!userDir.startsWith(root)) {
-            throw new IllegalArgumentException("Invalid upload path.");
-        }
-        Files.createDirectories(userDir);
         String extension = extensionFrom(photo.getOriginalFilename(), contentType);
         String fileName = "incident-" + UUID.randomUUID() + extension;
-        Path target = userDir.resolve(fileName).normalize();
-        if (!target.startsWith(userDir)) {
-            throw new IllegalArgumentException("Invalid upload file.");
-        }
-        Files.copy(photo.getInputStream(), target);
-        return "/api/uploads/community-media/" + userId + "/" + fileName;
+        String key = "community-media/" + userId + "/" + fileName;
+        return r2StorageService.uploadFile(key, photo.getInputStream(), contentType, photo.getSize());
     }
 
     private String extensionFrom(String originalName, String contentType) {

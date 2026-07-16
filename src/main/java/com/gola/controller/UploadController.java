@@ -3,8 +3,10 @@ package com.gola.controller;
 import com.gola.dto.common.ApiResponse;
 import com.gola.exception.GolaException;
 import com.gola.security.SecurityUtils;
+import com.gola.service.R2StorageService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.Data;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
@@ -47,7 +49,9 @@ import java.util.UUID;
 @RequestMapping("/uploads")
 @Tag(name = "Uploads")
 @Slf4j
+@RequiredArgsConstructor
 public class UploadController {
+    private final R2StorageService r2StorageService;
     private static final long COMMUNITY_MEDIA_MAX_BYTES = 15L * 1024 * 1024;
     private static final String IMAGE_TOO_LARGE_MESSAGE = "Ảnh quá lớn. Vui lòng chọn ảnh nhỏ hơn 15MB.";
     private static final int THUMBNAIL_MAX_WIDTH = 480;
@@ -94,32 +98,37 @@ public class UploadController {
 
         String ext = extensionFrom(original, contentType);
         String fileName = UUID.randomUUID() + ext;
-        Path root = Path.of("uploads", "community-media").toAbsolutePath().normalize();
-        Path dir = root.resolve(userId.toString()).normalize();
-        Path target = dir.resolve(fileName).normalize();
-        if (!target.startsWith(root)) {
-            throw GolaException.badRequest("Invalid upload path");
-        }
+        Path tempOriginal = null;
         try {
-            Files.createDirectories(dir);
-            Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+            tempOriginal = Files.createTempFile("gola-orig-", ext);
+            Files.copy(file.getInputStream(), tempOriginal, StandardCopyOption.REPLACE_EXISTING);
+
+            String key = "community-media/" + userId + "/" + fileName;
+            String publicUrl = r2StorageService.uploadFile(key, Files.newInputStream(tempOriginal), contentType, file.getSize());
+
+            MediaVariants variants = generateVariants(tempOriginal, userId, fileName);
+            log.info("Community media upload stored: userId={}, tripId={}, fileName={}, publicUrl={}",
+                    userId, tripId, fileName, publicUrl);
+            Map<String, String> response = new HashMap<>();
+            response.put("publicUrl", publicUrl);
+            response.put("originalUrl", publicUrl);
+            response.put("fileName", fileName);
+            response.put("thumbnailUrl", variants.thumbnailUrl() != null ? variants.thumbnailUrl() : publicUrl);
+            response.put("mediumUrl", variants.mediumUrl() != null ? variants.mediumUrl() : publicUrl);
+            return ResponseEntity.ok(ApiResponse.ok(response));
         } catch (IOException ex) {
             log.warn("Community media upload failed: userId={}, tripId={}, fileName={}, contentType={}, size={}, reason={}",
                     userId, tripId, original, contentType.isBlank() ? "unknown" : contentType, file.getSize(), ex.getMessage());
             throw GolaException.badRequest("Could not store uploaded image. Please try again.");
+        } finally {
+            if (tempOriginal != null) {
+                try {
+                    Files.deleteIfExists(tempOriginal);
+                } catch (IOException e) {
+                    log.warn("Failed to delete temp original file: {}", e.getMessage());
+                }
+            }
         }
-
-        String publicUrl = "/api/uploads/community-media/" + userId + "/" + fileName;
-        MediaVariants variants = generateVariants(target, dir, userId, fileName);
-        log.info("Community media upload stored: userId={}, tripId={}, fileName={}, publicUrl={}",
-                userId, tripId, fileName, publicUrl);
-        Map<String, String> response = new HashMap<>();
-        response.put("publicUrl", publicUrl);
-        response.put("originalUrl", publicUrl);
-        response.put("fileName", fileName);
-        response.put("thumbnailUrl", variants.thumbnailUrl() != null ? variants.thumbnailUrl() : publicUrl);
-        response.put("mediumUrl", variants.mediumUrl() != null ? variants.mediumUrl() : publicUrl);
-        return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
     @GetMapping("/community-media/{userId}/{fileName}")
@@ -178,28 +187,47 @@ public class UploadController {
                 .body(new FileSystemResource(file));
     }
 
-    private MediaVariants generateVariants(Path original, Path dir, UUID userId, String fileName) {
+    private MediaVariants generateVariants(Path tempOriginal, UUID userId, String fileName) {
+        Path tempThumb = null;
+        Path tempMedium = null;
         try {
-            BufferedImage source = ImageIO.read(original.toFile());
+            BufferedImage source = ImageIO.read(tempOriginal.toFile());
             if (source == null) {
                 log.warn("Community media variant generation skipped: ImageIO cannot decode fileName={}", fileName);
                 return MediaVariants.empty();
             }
             String baseName = stripExtension(fileName);
-            Path thumbnail = dir.resolve(baseName + "-thumb.jpg").normalize();
-            Path medium = dir.resolve(baseName + "-medium.jpg").normalize();
-            if (!thumbnail.startsWith(dir) || !medium.startsWith(dir)) {
-                return MediaVariants.empty();
-            }
+            tempThumb = Files.createTempFile("gola-thumb-", ".jpg");
+            tempMedium = Files.createTempFile("gola-med-", ".jpg");
 
-            writeJpegVariant(source, thumbnail, THUMBNAIL_MAX_WIDTH, 0.78f);
-            writeJpegVariant(source, medium, MEDIUM_MAX_WIDTH, 0.84f);
+            writeJpegVariant(source, tempThumb, THUMBNAIL_MAX_WIDTH, 0.78f);
+            writeJpegVariant(source, tempMedium, MEDIUM_MAX_WIDTH, 0.84f);
 
-            String prefix = "/api/uploads/community-media/" + userId + "/";
-            return new MediaVariants(prefix + thumbnail.getFileName(), prefix + medium.getFileName());
+            String thumbKey = "community-media/" + userId + "/" + baseName + "-thumb.jpg";
+            String mediumKey = "community-media/" + userId + "/" + baseName + "-medium.jpg";
+
+            String thumbnailUrl = r2StorageService.uploadFile(thumbKey, Files.newInputStream(tempThumb), "image/jpeg", Files.size(tempThumb));
+            String mediumUrl = r2StorageService.uploadFile(mediumKey, Files.newInputStream(tempMedium), "image/jpeg", Files.size(tempMedium));
+
+            return new MediaVariants(thumbnailUrl, mediumUrl);
         } catch (Exception ex) {
             log.warn("Community media variant generation failed: fileName={}, reason={}", fileName, ex.getMessage());
             return MediaVariants.empty();
+        } finally {
+            if (tempThumb != null) {
+                try {
+                    Files.deleteIfExists(tempThumb);
+                } catch (IOException e) {
+                    log.warn("Failed to delete temp thumb file: {}", e.getMessage());
+                }
+            }
+            if (tempMedium != null) {
+                try {
+                    Files.deleteIfExists(tempMedium);
+                } catch (IOException e) {
+                    log.warn("Failed to delete temp medium file: {}", e.getMessage());
+                }
+            }
         }
     }
 

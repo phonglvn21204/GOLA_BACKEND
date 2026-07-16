@@ -96,6 +96,9 @@ dependencies {
     // Auth0 JWT (for Google OAuth verification)
     implementation 'com.auth0:java-jwt:4.4.0'
 
+    // AWS S3 SDK for Cloudflare R2 integration
+    implementation 'software.amazon.awssdk:s3:2.25.15'
+
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'

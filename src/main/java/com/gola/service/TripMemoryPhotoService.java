@@ -43,6 +43,7 @@ public class TripMemoryPhotoService {
     private final TripMemoryPhotoRepository photoRepo;
     private final TripStopRepository stopRepo;
     private final MediaRepository mediaRepo;
+    private final R2StorageService r2StorageService;
 
     public List<TripMemoryPhotoResponse> listPhotos(UUID tripId, UUID userId) {
         requireTripMemory(tripId, userId);
@@ -98,11 +99,7 @@ public class TripMemoryPhotoService {
             .orElseThrow(() -> GolaException.notFound("Trip memory photo"));
         photoRepo.delete(photo);
         if (photo.getStoragePath() != null) {
-            try {
-                Files.deleteIfExists(Path.of(photo.getStoragePath()));
-            } catch (IOException e) {
-                log.warn("Could not delete trip memory photo file photoId={} path={}: {}", photoId, photo.getStoragePath(), e.getMessage());
-            }
+            r2StorageService.deleteFile(photo.getStoragePath());
         }
     }
 
@@ -111,19 +108,18 @@ public class TripMemoryPhotoService {
         String contentType = file.getContentType() == null ? "image/jpeg" : file.getContentType();
         String extension = extensionFor(originalName, contentType);
         String fileName = UUID.randomUUID() + extension;
-        Path dir = Path.of("uploads", "trip-memory-photos", tripId.toString()).toAbsolutePath().normalize();
-        Path path = dir.resolve(fileName).normalize();
+        String key = "trip-memory-photos/" + tripId + "/" + fileName;
+
+        String publicUrl;
         try {
-            Files.createDirectories(dir);
-            Files.copy(file.getInputStream(), path, StandardCopyOption.REPLACE_EXISTING);
+            publicUrl = r2StorageService.uploadFile(key, file.getInputStream(), contentType, file.getSize());
         } catch (IOException e) {
             throw GolaException.badRequest("Could not store uploaded photo");
         }
 
-        String publicUrl = "/api/uploads/trip-memory-photos/" + tripId + "/" + fileName;
         Media media = mediaRepo.save(Media.builder()
             .ownerId(userId)
-            .storagePath(path.toString())
+            .storagePath(key)
             .mimeType(contentType)
             .width(0)
             .height(0)
@@ -135,7 +131,7 @@ public class TripMemoryPhotoService {
             .userId(userId)
             .mediaId(media.getId())
             .imageUrl(publicUrl)
-            .storagePath(path.toString())
+            .storagePath(key)
             .originalFileName(originalName)
             .contentType(contentType)
             .fileSizeBytes(file.getSize())

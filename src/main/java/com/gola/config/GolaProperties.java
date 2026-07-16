@@ -28,6 +28,7 @@ public class GolaProperties {
     private Gemini gemini = new Gemini();
     private Ai ai = new Ai();
     private RateLimit rateLimit = new RateLimit();
+    private R2 r2 = new R2();
 
     @Data public static class Jwt {
         private String secret;
@@ -98,6 +99,13 @@ public class GolaProperties {
     }
     @Data public static class RateLimit {
         private boolean enabled = true;
+    }
+    @Data public static class R2 {
+        private String accessKeyId;
+        private String secretAccessKey;
+        private String bucketName;
+        private String endpoint;
+        private String publicUrl;
     }
 
     @PostConstruct

@@ -1594,17 +1594,41 @@ public class TripMemoryArtifactService {
             return Optional.empty();
         }
         String normalized = imageUrl.trim();
-        String marker = "/api/uploads/trip-memory-photos/";
+
+        // 1. Check if it's a local /api/uploads URL:
+        String marker = "/api/uploads/";
         int markerIndex = normalized.indexOf(marker);
-        if (markerIndex < 0) {
-            return Optional.empty();
+        if (markerIndex >= 0) {
+            String relative = normalized.substring(markerIndex + marker.length()).replace('\\', '/');
+            if (!relative.contains("..")) {
+                Path path = Path.of("uploads").resolve(relative).toAbsolutePath().normalize();
+                if (Files.isRegularFile(path)) {
+                    return Optional.of(path);
+                }
+            }
         }
-        String relative = normalized.substring(markerIndex + "/api/uploads/".length()).replace('\\', '/');
-        if (relative.contains("..")) {
-            return Optional.empty();
+
+        // 2. If it's a full remote URL (e.g. starts with http/https), download it to a temp file
+        if (normalized.startsWith("http://") || normalized.startsWith("https://")) {
+            try {
+                String ext = ".jpg";
+                String lower = normalized.toLowerCase(Locale.ROOT);
+                if (lower.endsWith(".png")) ext = ".png";
+                else if (lower.endsWith(".webp")) ext = ".webp";
+                else if (lower.endsWith(".gif")) ext = ".gif";
+
+                Path temp = Files.createTempFile("gola-download-", ext);
+                temp.toFile().deleteOnExit();
+                try (java.io.InputStream in = new java.net.URI(normalized).toURL().openStream()) {
+                    Files.copy(in, temp, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                }
+                return Optional.of(temp);
+            } catch (Exception e) {
+                log.warn("Failed to download image from URL {}: {}", normalized, e.getMessage());
+            }
         }
-        Path path = Path.of("uploads").resolve(relative).toAbsolutePath().normalize();
-        return Files.isRegularFile(path) ? Optional.of(path) : Optional.empty();
+
+        return Optional.empty();
     }
 
     private String dateRange(Trip trip) {
