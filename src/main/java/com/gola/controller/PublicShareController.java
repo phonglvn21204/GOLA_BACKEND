@@ -82,7 +82,7 @@ public class PublicShareController {
               <style>
                 body { margin: 0; min-height: 100vh; display: grid; place-items: center; font-family: Inter, system-ui, sans-serif; background: #071513; color: #f8fafc; }
                 main { width: min(92vw, 720px); padding: 32px; border: 1px solid rgba(255,255,255,.12); border-radius: 28px; background: linear-gradient(145deg, rgba(20,184,166,.16), rgba(15,23,42,.92)); box-shadow: 0 28px 80px rgba(0,0,0,.32); }
-                img { width: 100%; max-height: 360px; object-fit: cover; border-radius: 22px; margin-bottom: 24px; background: rgba(255,255,255,.08); }
+                img { width: 100%%; max-height: 360px; object-fit: cover; border-radius: 22px; margin-bottom: 24px; background: rgba(255,255,255,.08); }
                 .brand { color: #2dd4bf; font-weight: 800; letter-spacing: .14em; font-size: 12px; text-transform: uppercase; }
                 h1 { margin: 10px 0 12px; font-size: clamp(30px, 6vw, 52px); line-height: 1.02; }
                 p { color: rgba(248,250,252,.78); line-height: 1.7; }
