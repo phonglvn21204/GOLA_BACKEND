@@ -4,7 +4,6 @@ import com.gola.config.GolaProperties;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -17,8 +16,11 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import java.io.InputStream;
 import java.net.URI;
 
+/**
+ * Legacy Cloudflare R2 storage client kept for rollback. Not registered as a Spring bean.
+ * Active storage implementation: {@link SupabaseStorageService}.
+ */
 @Slf4j
-@Service
 @RequiredArgsConstructor
 public class R2StorageService {
 
@@ -28,8 +30,17 @@ public class R2StorageService {
     @PostConstruct
     public void init() {
         GolaProperties.R2 r2 = properties.getR2();
-        if (r2 == null || r2.getAccessKeyId() == null || r2.getSecretAccessKey() == null) {
-            log.warn("Cloudflare R2 properties are not configured. R2 uploads will fail.");
+        if (r2 == null
+                || !hasText(r2.getAccessKeyId())
+                || !hasText(r2.getSecretAccessKey())
+                || !hasText(r2.getEndpoint())
+                || !hasText(r2.getBucketName())) {
+            log.warn("Cloudflare R2 properties are NOT fully configured — R2 uploads will fail. "
+                    + "Resolved values: endpoint=[{}], bucket=[{}], accessKeyId=[{}], publicUrl=[{}]",
+                    r2 != null ? r2.getEndpoint() : "null",
+                    r2 != null ? r2.getBucketName() : "null",
+                    r2 != null ? mask(r2.getAccessKeyId()) : "null",
+                    r2 != null ? r2.getPublicUrl() : "null");
             return;
         }
         try {
@@ -43,16 +54,20 @@ public class R2StorageService {
                     .pathStyleAccessEnabled(true)
                     .build())
                 .build();
-            log.info("Cloudflare R2 S3Client initialized successfully with endpoint: {}", r2.getEndpoint());
+            log.info("Cloudflare R2 S3Client initialized: endpoint=[{}], bucket=[{}], publicUrl=[{}]",
+                    r2.getEndpoint(), r2.getBucketName(), r2.getPublicUrl());
         } catch (Exception e) {
-            log.error("Failed to initialize Cloudflare R2 S3Client: {}", e.getMessage(), e);
+            log.error("Failed to initialize Cloudflare R2 S3Client: endpoint=[{}], bucket=[{}], error={}",
+                    r2.getEndpoint(), r2.getBucketName(), e.getMessage(), e);
         }
     }
 
     public String uploadFile(String key, InputStream inputStream, String contentType, long contentLength) {
         GolaProperties.R2 r2 = properties.getR2();
         if (s3Client == null) {
-            throw new IllegalStateException("R2 Storage client is not initialized.");
+            throw new IllegalStateException(
+                "R2 Storage client is not initialized. Check that R2_ACCESS_KEY_ID, "
+                + "R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME, R2_ENDPOINT environment variables are set.");
         }
         try {
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()
@@ -62,10 +77,11 @@ public class R2StorageService {
                 .build();
 
             s3Client.putObject(putObjectRequest, RequestBody.fromInputStream(inputStream, contentLength));
-            log.info("Successfully uploaded file to R2: bucket={}, key={}, size={}", r2.getBucketName(), key, contentLength);
+            log.info("Successfully uploaded file to R2: bucket=[{}], key=[{}], size={}", r2.getBucketName(), key, contentLength);
             return getPublicUrl(key);
         } catch (Exception e) {
-            log.error("Failed to upload file to R2: key={}, error={}", key, e.getMessage(), e);
+            log.error("Failed to upload file to R2: bucket=[{}], endpoint=[{}], key=[{}], error={}",
+                    r2.getBucketName(), r2.getEndpoint(), key, e.getMessage(), e);
             throw new RuntimeException("Could not store uploaded file: " + e.getMessage(), e);
         }
     }
@@ -91,12 +107,24 @@ public class R2StorageService {
     public String getPublicUrl(String key) {
         GolaProperties.R2 r2 = properties.getR2();
         String publicUrl = r2.getPublicUrl();
-        if (publicUrl == null) {
+        if (!hasText(publicUrl)) {
             return "/" + key;
         }
         if (publicUrl.endsWith("/")) {
             return publicUrl + key;
         }
         return publicUrl + "/" + key;
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    /** Masks a credential for safe logging: shows first 4 chars then asterisks. */
+    private static String mask(String value) {
+        if (value == null) return "null";
+        if (value.isBlank()) return "(empty)";
+        if (value.length() <= 4) return "****";
+        return value.substring(0, 4) + "****";
     }
 }

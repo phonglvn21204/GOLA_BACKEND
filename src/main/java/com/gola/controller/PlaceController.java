@@ -4,6 +4,7 @@ import com.gola.dto.common.ApiResponse;
 import com.gola.dto.map.AutocompleteSuggestion;
 import com.gola.dto.map.PlaceDetail;
 import com.gola.dto.map.PlaceResponse;
+import com.gola.dto.map.ReverseGeocodeResponse;
 import com.gola.service.PlaceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -42,6 +43,14 @@ public class PlaceController {
     @Operation(summary = "Get place details from Goong place ID")
     public ResponseEntity<ApiResponse<PlaceDetail>> getPlaceDetail(@RequestParam String placeId) {
         return ResponseEntity.ok(ApiResponse.ok(placeService.getPlaceDetail(placeId)));
+    }
+
+    @GetMapping("/reverse-geocode")
+    @Operation(summary = "Reverse geocode coordinates to formatted address via Goong")
+    public ResponseEntity<ApiResponse<ReverseGeocodeResponse>> reverseGeocode(
+            @RequestParam double lat,
+            @RequestParam double lng) {
+        return ResponseEntity.ok(ApiResponse.ok(placeService.reverseGeocode(lat, lng)));
     }
 
     @GetMapping("/{id}")

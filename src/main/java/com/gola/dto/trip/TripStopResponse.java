@@ -4,6 +4,7 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.List;
 
 @Data @Builder
 public class TripStopResponse {
@@ -20,6 +21,9 @@ public class TripStopResponse {
     private Double lat;
     private Double lng;
     private String imageUrl;
+    private List<String> photoUrls;
+    private String phone;
+    private String website;
     private BigDecimal rating;
     private Integer reviewCount;
     private String imageSource;

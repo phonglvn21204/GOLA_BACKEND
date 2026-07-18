@@ -55,6 +55,14 @@ public class AiConfig {
         return executor;
     }
 
+    @Bean("supabaseRestTemplate")
+    public RestTemplate supabaseRestTemplate(RestTemplateBuilder builder) {
+        return builder
+            .setConnectTimeout(Duration.ofSeconds(10))
+            .setReadTimeout(Duration.ofSeconds(60))
+            .build();
+    }
+
     @Bean("nominatimRestTemplate")
     public RestTemplate nominatimRestTemplate() {
         RestTemplate rt = new RestTemplate();

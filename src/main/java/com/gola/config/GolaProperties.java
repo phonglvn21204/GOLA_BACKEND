@@ -29,6 +29,7 @@ public class GolaProperties {
     private Ai ai = new Ai();
     private RateLimit rateLimit = new RateLimit();
     private R2 r2 = new R2();
+    private Supabase supabase = new Supabase();
 
     @Data public static class Jwt {
         private String secret;
@@ -82,11 +83,11 @@ public class GolaProperties {
     }
     @Data public static class Generate {
         private String mode = "ai_first";
-        private boolean useVerifiedCandidatePool = false;
+        private boolean useVerifiedCandidatePool = true;
         private boolean useScrapingdogContext = true;
         private boolean enrichAfterGemini = true;
-        private boolean criticEnabled = false;
-        private boolean deepGapFillerEnabled = false;
+        private boolean criticEnabled = true;
+        private boolean deepGapFillerEnabled = true;
         private boolean routeDuringPreview = false;
         private int maxProviderCalls = 10;
         private int maxCandidatesToVerify = 12;
@@ -106,6 +107,15 @@ public class GolaProperties {
         private String bucketName;
         private String endpoint;
         private String publicUrl;
+    }
+    @Data public static class Supabase {
+        private String url;
+        private String serviceRoleKey;
+        private Storage storage = new Storage();
+
+        @Data public static class Storage {
+            private String bucket = "trip-memory-photos";
+        }
     }
 
     @PostConstruct

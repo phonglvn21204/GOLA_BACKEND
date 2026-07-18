@@ -5,12 +5,13 @@ import com.gola.dto.user.ProfileResponse;
 import com.gola.dto.user.UpdateProfileRequest;
 import com.gola.security.SecurityUtils;
 import com.gola.service.ProfileService;
-import com.gola.service.R2StorageService;
+import com.gola.service.SupabaseStorageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.MediaType;
 import org.springframework.util.StringUtils;
@@ -26,6 +27,7 @@ import java.util.UUID;
 import java.util.Map;
 import java.util.HashMap;
 
+@Slf4j
 @RestController
 @RequiredArgsConstructor
 @Tag(name = "Profile", description = "User profile management")
@@ -33,7 +35,7 @@ public class ProfileController {
     private static final long AVATAR_MAX_BYTES = 5L * 1024 * 1024;
 
     private final ProfileService profileService;
-    private final R2StorageService r2StorageService;
+    private final SupabaseStorageService supabaseStorageService;
 
     @GetMapping("/me")
     @Operation(summary = "Get my own profile")
@@ -114,12 +116,55 @@ public class ProfileController {
 
         String ext = extensionFrom(original, contentType);
         String fileName = UUID.randomUUID() + ext;
-        String key = "avatars/" + userId + "/" + fileName;
+        String key = "avatars/" + userId + "-" + fileName;
         try {
-            return r2StorageService.uploadFile(key, file.getInputStream(), contentType, file.getSize());
+            // Delete old avatar if exists
+            String oldAvatarUrl = profileService.getMyProfile(userId).getAvatarUrl();
+            if (oldAvatarUrl != null && !oldAvatarUrl.isBlank()) {
+                deleteOldAvatar(oldAvatarUrl);
+            }
+            
+            String newAvatarUrl = supabaseStorageService.uploadFile(key, file.getInputStream(), contentType, file.getSize());
+            log.info("Upload avatar to Supabase: userId={}, fileName={}", userId, fileName);
+            return newAvatarUrl;
         } catch (IOException ex) {
+            log.error("Avatar upload failed: userId={}, fileName={}, error={}", userId, fileName, ex.getMessage());
             throw com.gola.exception.GolaException.badRequest("Could not store avatar image");
         }
+    }
+
+    private void deleteOldAvatar(String oldAvatarUrl) {
+        try {
+            if (oldAvatarUrl == null || oldAvatarUrl.isBlank()) {
+                return;
+            }
+            String oldKey = extractKeyFromSupabaseUrl(oldAvatarUrl);
+            if (oldKey != null && oldKey.startsWith("avatars/")) {
+                supabaseStorageService.deleteFile(oldKey);
+                log.info("Deleted old avatar from Supabase: oldKey={}", oldKey);
+            }
+        } catch (Exception ex) {
+            log.warn("Failed to delete old avatar from Supabase: oldAvatarUrl={}, error={}", oldAvatarUrl, ex.getMessage());
+        }
+    }
+
+    private String extractKeyFromSupabaseUrl(String supabaseUrl) {
+        if (supabaseUrl == null || !supabaseUrl.contains("/storage/v1/object/public/")) {
+            return null;
+        }
+        try {
+            String[] parts = supabaseUrl.split("/storage/v1/object/public/");
+            if (parts.length > 1) {
+                String pathWithBucket = parts[1];
+                String[] bucketAndPath = pathWithBucket.split("/", 2);
+                if (bucketAndPath.length > 1) {
+                    return java.net.URLDecoder.decode(bucketAndPath[1], java.nio.charset.StandardCharsets.UTF_8);
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("Failed to extract key from Supabase URL: url={}, error={}", supabaseUrl, ex.getMessage());
+        }
+        return null;
     }
 
     private boolean isSupportedImage(String fileName, String contentType) {

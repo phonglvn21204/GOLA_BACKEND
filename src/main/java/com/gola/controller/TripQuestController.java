@@ -4,7 +4,7 @@ import com.gola.dto.common.ApiResponse;
 import com.gola.dto.quest.QuestProgressResponse;
 import com.gola.security.SecurityUtils;
 import com.gola.service.QuestService;
-import com.gola.service.R2StorageService;
+import com.gola.service.SupabaseStorageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -30,7 +30,7 @@ public class TripQuestController {
     private static final long QUEST_PROOF_MAX_BYTES = 12L * 1024 * 1024;
 
     private final QuestService questService;
-    private final R2StorageService r2StorageService;
+    private final SupabaseStorageService supabaseStorageService;
 
     @GetMapping
     @Operation(summary = "List quest progress generated for a trip")
@@ -92,7 +92,7 @@ public class TripQuestController {
         String fileName = "quest-" + UUID.randomUUID() + ext;
         String key = "quests/" + userId + "/" + fileName;
         try {
-            return r2StorageService.uploadFile(key, file.getInputStream(), contentType, file.getSize());
+            return supabaseStorageService.uploadFile(key, file.getInputStream(), contentType, file.getSize());
         } catch (IOException ex) {
             throw com.gola.exception.GolaException.badRequest("Could not store quest proof photo.");
         }

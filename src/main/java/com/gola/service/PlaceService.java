@@ -5,6 +5,7 @@ import com.gola.config.GolaProperties;
 import com.gola.dto.map.AutocompleteSuggestion;
 import com.gola.dto.map.PlaceDetail;
 import com.gola.dto.map.PlaceResponse;
+import com.gola.dto.map.ReverseGeocodeResponse;
 import com.gola.entity.Place;
 import com.gola.exception.GolaException;
 import com.gola.repository.PlaceRepository;
@@ -18,10 +19,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Base64;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -32,6 +31,24 @@ public class PlaceService {
     private final RestTemplate nominatimRestTemplate;
     private final GolaProperties properties;
     private final PlaceEnrichmentService placeEnrichmentService;
+    
+    // In-memory cache for reverse geocoding: key = "lat,lng" (rounded to 4 decimals ~11m), value = {response, timestamp}
+    private final Map<String, CachedReverseGeocode> reverseGeocodeCache = new ConcurrentHashMap<>();
+    private static final long CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+    
+    private static class CachedReverseGeocode {
+        final ReverseGeocodeResponse response;
+        final long timestamp;
+        
+        CachedReverseGeocode(ReverseGeocodeResponse response) {
+            this.response = response;
+            this.timestamp = System.currentTimeMillis();
+        }
+        
+        boolean isExpired() {
+            return System.currentTimeMillis() - timestamp > CACHE_TTL_MS;
+        }
+    }
 
     public PlaceService(
             PlaceRepository placeRepo,
@@ -144,6 +161,92 @@ public class PlaceService {
             if (fallback != null) return fallback;
             throw GolaException.notFound("Place detail");
         }
+    }
+
+    /**
+     * Reverse geocode coordinates to get formatted address.
+     * Uses Goong Geocoding API with in-memory cache (24h TTL, rounded to ~11m precision).
+     */
+    public ReverseGeocodeResponse reverseGeocode(double lat, double lng) {
+        // Validate coordinates
+        if (!isValidCoordinate(lat) || !isValidCoordinate(lng)) {
+            throw GolaException.badRequest("Invalid coordinates");
+        }
+
+        // Round to 4 decimals (~11m precision) for cache key
+        String cacheKey = String.format("%.4f,%.4f", lat, lng);
+        
+        // Check cache first
+        CachedReverseGeocode cached = reverseGeocodeCache.get(cacheKey);
+        if (cached != null && !cached.isExpired()) {
+            log.debug("Reverse geocode cache hit for {}", cacheKey);
+            return cached.response;
+        }
+
+        try {
+            String apiKey = properties.getGoong().getApiKey();
+            if (apiKey == null || apiKey.isBlank()) {
+                throw new IllegalStateException("GOONG_API_KEY is not configured");
+            }
+
+            String url = UriComponentsBuilder
+                    .fromHttpUrl("https://rsapi.goong.io/Geocode")
+                    .queryParam("latlng", lat + "," + lng)
+                    .queryParam("api_key", apiKey)
+                    .build()
+                    .toUriString();
+
+            ResponseEntity<JsonNode> response = goongRestTemplate.getForEntity(url, JsonNode.class);
+            JsonNode body = response.getBody();
+            JsonNode results = body != null ? body.path("results") : null;
+
+            if (results == null || !results.isArray() || results.isEmpty()) {
+                log.warn("Goong reverse geocode returned no results for {},{}", lat, lng);
+                return buildFallbackResponse(lat, lng);
+            }
+
+            JsonNode firstResult = results.get(0);
+            String formattedAddress = firstResult.path("formatted_address").asText(null);
+            
+            if (formattedAddress == null || formattedAddress.isBlank()) {
+                log.warn("Goong reverse geocode returned empty address for {},{}", lat, lng);
+                return buildFallbackResponse(lat, lng);
+            }
+
+            // Build short formatted version (first 2-3 parts)
+            String[] parts = formattedAddress.split(",");
+            String shortFormatted = parts.length <= 3 
+                ? formattedAddress 
+                : String.join(",", Arrays.copyOfRange(parts, 0, Math.min(3, parts.length))).trim();
+
+            ReverseGeocodeResponse result = ReverseGeocodeResponse.builder()
+                    .address(formattedAddress)
+                    .formatted(shortFormatted)
+                    .build();
+
+            // Cache the result
+            reverseGeocodeCache.put(cacheKey, new CachedReverseGeocode(result));
+            log.debug("Reverse geocode cached for {} -> {}", cacheKey, shortFormatted);
+
+            return result;
+
+        } catch (Exception e) {
+            log.warn("Goong reverse geocode failed for {},{}: {}", lat, lng, safeProviderError(e));
+            // Return fallback instead of throwing error
+            return buildFallbackResponse(lat, lng);
+        }
+    }
+    
+    private boolean isValidCoordinate(double value) {
+        return Double.isFinite(value) && value != 0.0 && value >= -180.0 && value <= 180.0;
+    }
+    
+    private ReverseGeocodeResponse buildFallbackResponse(double lat, double lng) {
+        String fallback = String.format("%.5f, %.5f", lat, lng);
+        return ReverseGeocodeResponse.builder()
+                .address(fallback)
+                .formatted(fallback)
+                .build();
     }
 
     @Transactional

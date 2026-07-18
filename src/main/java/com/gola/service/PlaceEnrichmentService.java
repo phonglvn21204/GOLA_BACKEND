@@ -618,6 +618,12 @@ public class PlaceEnrichmentService {
                 String thumbnail = serpThumbnail(result);
                 detail.setProviderTitle(result.path("title").asText(null));
                 detail.setProviderId(firstText(result.path("data_id").asText(null), result.path("data_cid").asText(null), result.path("place_id").asText(null), result.path("title").asText(null)));
+                String phone = result.path("phone").asText(null);
+                if (phone != null && !phone.isBlank()) detail.setPhone(phone);
+                String website = result.path("website").asText(null);
+                if (website != null && !website.isBlank()) detail.setWebsite(website);
+                List<String> photoUrls = serpPhotoUrls(result);
+                if (!photoUrls.isEmpty()) detail.setPhotoUrls(photoUrls);
                 if (isUsefulImageUrl(thumbnail) && isAcceptableSerpImageResult(result, placeName, city, category)) {
                     detail.setImageUrl(thumbnail);
                     detail.setImageSource(IMAGE_SOURCE_SERPAPI);
@@ -679,6 +685,24 @@ public class PlaceEnrichmentService {
         } catch (Exception e) {
             log.warn("SerpApi place enrichment failed for '{}': {}", placeName, safeProviderError(e));
         }
+    }
+
+    /** Keeps original SerpApi/Google Maps URLs only; callers must not download or proxy them. */
+    private List<String> serpPhotoUrls(JsonNode result) {
+        List<String> urls = new ArrayList<>();
+        JsonNode photos = result.path("photos");
+        if (!photos.isArray()) return urls;
+        for (JsonNode photo : photos) {
+            String url = firstText(
+                    photo.path("thumbnail").asText(null), photo.path("image").asText(null),
+                    photo.path("photo_url").asText(null), photo.path("link").asText(null),
+                    photo.isTextual() ? photo.asText(null) : null);
+            if (isUsefulImageUrl(url) && !urls.contains(url)) {
+                urls.add(url);
+                if (urls.size() == 5) break;
+            }
+        }
+        return urls;
     }
 
     private void applySerpApiGoogleSearchFallback(

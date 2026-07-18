@@ -946,6 +946,7 @@ public class AiTripService {
         GeoFence destinationFence = resolveDestinationFence(destination, stops);
         for (AiGeneratedStop aiStop : stops) {
             if (aiStop.getPlaceName() == null || aiStop.getPlaceName().isBlank()) continue;
+            String resolutionFailureContext = "NOT_RESOLVED";
             try {
                 var addReq = new AddStopRequest();
                 addReq.setName(aiStop.getPlaceName().trim());
@@ -1042,6 +1043,10 @@ public class AiTripService {
                     if (enrichDetail != null && enrichDetail.getRejectedReason() != null) {
                         addReq.setPlaceDataRejectReason(enrichDetail.getRejectedReason());
                     }
+                    resolutionFailureContext = "enrichmentSource=" + (enrichDetail == null ? null : enrichDetail.getDataSource())
+                            + ", enrichmentRejectedReason=" + (enrichDetail == null ? "NO_ENRICHMENT_RESULT" : nullToEmpty(enrichDetail.getRejectedReason()))
+                            + ", goongSource=" + (goongDetail == null ? null : goongDetail.getDataSource())
+                            + ", goongRejectedReason=" + (goongDetail == null ? "NO_GOONG_RESULT" : nullToEmpty(goongDetail.getRejectedReason()));
                 }
 
                 if (isRealPlaceStop && enrichDetail != null
@@ -1068,8 +1073,21 @@ public class AiTripService {
                 }
 
                 if (isRealPlaceStop && !isValidCoordinate(addReq.getLat(), addReq.getLng())) {
-                    log.warn("Missing reliable coordinates for AI stop '{}' category={} destination='{}'; saving without fake fallback",
-                            aiStop.getPlaceName(), normalizedCategory, destination);
+                    String enrichmentReason = enrichDetail == null ? "NO_ENRICHMENT_RESULT" : nullToEmpty(enrichDetail.getRejectedReason());
+                    String goongReason = goongDetail == null ? "NO_GOONG_RESULT" : nullToEmpty(goongDetail.getRejectedReason());
+                    log.warn("Missing reliable coordinates for AI stop '{}' category={} realPlace=true destination='{}' enrichmentSource={} enrichmentRejectedReason={} goongSource={} goongRejectedReason={}",
+                            aiStop.getPlaceName(), normalizedCategory, destination,
+                            enrichDetail == null ? null : enrichDetail.getDataSource(), enrichmentReason,
+                            goongDetail == null ? null : goongDetail.getDataSource(), goongReason);
+                    if (isMealOrCafeCategory(normalizedCategory)) {
+                        GeoPoint approximate = localCluster.anchor().orElse(destinationFence.center());
+                        addReq.setLat(approximate.lat());
+                        addReq.setLng(approximate.lng());
+                        addReq.setDataSource("APPROX");
+                        addReq.setHasRealCoordinates(false);
+                        addReq.setPlaceDataRejectReason("APPROXIMATE_COORDINATES:" + enrichmentReason + ";GOONG:" + goongReason);
+                        log.warn("Saving required meal/cafe stop '{}' with APPROX coordinates [{}, {}]", aiStop.getPlaceName(), approximate.lat(), approximate.lng());
+                    }
                 }
 
                 if (accommodationCheckinStop && hasRealHotelPlaceCandidate(enrichDetail)) {
@@ -1087,6 +1105,9 @@ public class AiTripService {
                         addReq.setName("Nhận phòng tại " + enrichDetail.getName());
                     }
                     addReq.setImageUrl(enrichDetail.getImageUrl());
+                    addReq.setPhotoUrls(enrichDetail.getPhotoUrls());
+                    addReq.setPhone(enrichDetail.getPhone());
+                    addReq.setWebsite(enrichDetail.getWebsite());
                     addReq.setRating(enrichDetail.getRating());
                     addReq.setReviewCount(enrichDetail.getReviewCount());
                     if (addReq.getEstimatedCost() == null && enrichDetail.getEstimatedCost() != null) {
@@ -1152,7 +1173,9 @@ public class AiTripService {
                 }
                 saved++;
             } catch (Exception e) {
-                log.warn("Failed to save stop '{}': {}", aiStop.getPlaceName(), e.getMessage());
+                log.warn("Failed to save AI stop '{}' category={} realPlace={} {} exception={}",
+                        aiStop.getPlaceName(), normalizeStopCategory(aiStop.getCategory()), isRealPlaceStop(aiStop),
+                        resolutionFailureContext, e.toString(), e);
             }
         }
         return saved;
@@ -1424,20 +1447,17 @@ public class AiTripService {
     }
 
     private boolean shouldRetryGenericEnrichment(PlaceDetail detail, AiGeneratedStop stop, String category) {
-        if (!isGenericLocalStop(stop) || !isMealOrCafeCategory(category)) {
+        if (!isMealOrCafeCategory(category)) {
             return false;
         }
         if (detail == null) {
             return true;
         }
         String reason = detail.getRejectedReason();
-        if (Set.of("NAME_RESERVED_FOR_EXACT_STOP", "DUPLICATE_PROVIDER_CANDIDATE").contains(reason)) {
+        if (reason != null && Set.of("NAME_RESERVED_FOR_EXACT_STOP", "DUPLICATE_PROVIDER_CANDIDATE").contains(reason)) {
             return true;
         }
-        return !isValidCoordinate(detail.getLat(), detail.getLng())
-                && detail.getImageUrl() == null
-                && detail.getRating() == null
-                && detail.getReviewCount() == null;
+        return !isValidCoordinate(detail.getLat(), detail.getLng());
     }
 
     private PlaceDetail resolveAlternateGenericEnrichment(

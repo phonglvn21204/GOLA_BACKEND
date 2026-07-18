@@ -19,6 +19,8 @@ public interface SavedPostRepository extends JpaRepository<SavedPost, UUID> {
 
     void deleteByUserIdAndPostId(UUID userId, UUID postId);
 
+    void deleteByPostId(UUID postId);
+
     long countByPostId(UUID postId);
 
     @Query("""

@@ -14,4 +14,5 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
     List<Comment> findByParentIdOrderByCreatedAtAsc(UUID parentId);
     long countByPostId(UUID postId);
     long countByPostIdAndHiddenFalse(UUID postId);
+    void deleteByPostId(UUID postId);
 }

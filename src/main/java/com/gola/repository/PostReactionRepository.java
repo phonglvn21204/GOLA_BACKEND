@@ -14,5 +14,6 @@ public interface PostReactionRepository extends JpaRepository<PostReaction, UUID
     Optional<PostReaction> findByPostIdAndUserId(UUID postId, UUID userId);
     List<PostReaction> findAllByPostIdAndUserId(UUID postId, UUID userId);
     void deleteByPostIdAndUserId(UUID postId, UUID userId);
+    void deleteByPostId(UUID postId);
     int countByPostId(UUID postId);
 }

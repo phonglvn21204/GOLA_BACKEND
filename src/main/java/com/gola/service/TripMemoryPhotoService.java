@@ -43,7 +43,7 @@ public class TripMemoryPhotoService {
     private final TripMemoryPhotoRepository photoRepo;
     private final TripStopRepository stopRepo;
     private final MediaRepository mediaRepo;
-    private final R2StorageService r2StorageService;
+    private final SupabaseStorageService supabaseStorageService;
 
     public List<TripMemoryPhotoResponse> listPhotos(UUID tripId, UUID userId) {
         requireTripMemory(tripId, userId);
@@ -99,7 +99,7 @@ public class TripMemoryPhotoService {
             .orElseThrow(() -> GolaException.notFound("Trip memory photo"));
         photoRepo.delete(photo);
         if (photo.getStoragePath() != null) {
-            r2StorageService.deleteFile(photo.getStoragePath());
+            supabaseStorageService.deleteFile(photo.getStoragePath());
         }
     }
 
@@ -112,7 +112,7 @@ public class TripMemoryPhotoService {
 
         String publicUrl;
         try {
-            publicUrl = r2StorageService.uploadFile(key, file.getInputStream(), contentType, file.getSize());
+            publicUrl = supabaseStorageService.uploadFile(key, file.getInputStream(), contentType, file.getSize());
         } catch (IOException e) {
             throw GolaException.badRequest("Could not store uploaded photo");
         }

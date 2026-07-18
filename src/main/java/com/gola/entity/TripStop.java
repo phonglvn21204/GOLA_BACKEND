@@ -6,6 +6,8 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "trip_stops")
@@ -48,6 +50,19 @@ public class TripStop {
 
     @Column(name = "image_url", columnDefinition = "TEXT")
     private String imageUrl;
+
+    @ElementCollection
+    @CollectionTable(name = "trip_stop_images", joinColumns = @JoinColumn(name = "trip_stop_id"))
+    @OrderColumn(name = "sort_order")
+    @Column(name = "image_url", columnDefinition = "TEXT", nullable = false)
+    @Builder.Default
+    private List<String> photoUrls = new ArrayList<>();
+
+    @Column(name = "phone", length = 100)
+    private String phone;
+
+    @Column(name = "website", columnDefinition = "TEXT")
+    private String website;
 
     @Column(name = "rating", precision = 3, scale = 2)
     private BigDecimal rating;

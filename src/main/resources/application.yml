@@ -86,11 +86,11 @@ gola:
   ai:
     generate:
       mode: ${GOLA_AI_GENERATE_MODE:ai_first}
-      use-verified-candidate-pool: ${GOLA_AI_GENERATE_USE_VERIFIED_CANDIDATE_POOL:false}
+      use-verified-candidate-pool: ${GOLA_AI_GENERATE_USE_VERIFIED_CANDIDATE_POOL:true}
       use-scrapingdog-context: ${GOLA_AI_GENERATE_USE_SCRAPINGDOG_CONTEXT:true}
       enrich-after-gemini: ${GOLA_AI_GENERATE_ENRICH_AFTER_GEMINI:true}
-      critic-enabled: ${GOLA_AI_GENERATE_CRITIC_ENABLED:false}
-      deep-gap-filler-enabled: ${GOLA_AI_GENERATE_DEEP_GAP_FILLER_ENABLED:false}
+      critic-enabled: ${GOLA_AI_GENERATE_CRITIC_ENABLED:true}
+      deep-gap-filler-enabled: ${GOLA_AI_GENERATE_DEEP_GAP_FILLER_ENABLED:true}
       route-during-preview: ${GOLA_AI_GENERATE_ROUTE_DURING_PREVIEW:false}
       max-provider-calls: ${GOLA_AI_GENERATE_MAX_PROVIDER_CALLS:10}
       max-candidates-to-verify: ${GOLA_AI_GENERATE_MAX_CANDIDATES_TO_VERIFY:12}
@@ -149,6 +149,11 @@ gola:
     bucket-name: ${R2_BUCKET_NAME:}
     endpoint: ${R2_ENDPOINT:}
     public-url: ${R2_PUBLIC_URL:}
+  supabase:
+    url: ${SUPABASE_URL:}
+    service-role-key: ${SUPABASE_SERVICE_ROLE_KEY:}
+    storage:
+      bucket: ${SUPABASE_STORAGE_BUCKET:trip-memory-photos}
 
 springdoc:
   api-docs:

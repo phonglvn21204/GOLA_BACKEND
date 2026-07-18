@@ -142,6 +142,9 @@ public class TripService {
                 .lat(req.getLat())
                 .lng(req.getLng())
                 .imageUrl(req.getImageUrl())
+                .photoUrls(req.getPhotoUrls() == null ? new java.util.ArrayList<>() : req.getPhotoUrls())
+                .phone(req.getPhone())
+                .website(req.getWebsite())
                 .rating(req.getRating())
                 .reviewCount(req.getReviewCount())
                 .imageSource(req.getImageSource())
@@ -213,6 +216,7 @@ public class TripService {
         }
 
         try {
+            boolean preserveApproximateCoordinates = "APPROX".equalsIgnoreCase(req.getDataSource());
             boolean hadTrustedCoordinates = hasValidCoordinate(req.getLat(), req.getLng())
                     && isTrustedCoordinateSource(req.getDataSource());
             PlaceDetail detail = placeEnrichmentService.enrichForStop(
@@ -237,6 +241,9 @@ public class TripService {
             }
 
             if (req.getImageUrl() == null) req.setImageUrl(detail.getImageUrl());
+            if (req.getPhotoUrls() == null || req.getPhotoUrls().isEmpty()) req.setPhotoUrls(detail.getPhotoUrls());
+            if (req.getPhone() == null) req.setPhone(detail.getPhone());
+            if (req.getWebsite() == null) req.setWebsite(detail.getWebsite());
             if (req.getRating() == null) req.setRating(detail.getRating());
             if (req.getReviewCount() == null) req.setReviewCount(detail.getReviewCount());
             if (req.getEstimatedCost() == null && detail.getEstimatedCost() != null) {
@@ -245,13 +252,13 @@ public class TripService {
             if (req.getPlaceAddress() == null) {
                 req.setPlaceAddress(detail.getPlaceAddress() != null ? detail.getPlaceAddress() : detail.getAddress());
             }
-            if (!hasValidCoordinate(req.getLat(), req.getLng()) && hasValidCoordinate(detail.getLat(), detail.getLng())) {
+            if (!preserveApproximateCoordinates && !hasValidCoordinate(req.getLat(), req.getLng()) && hasValidCoordinate(detail.getLat(), detail.getLng())) {
                 req.setLat(detail.getLat());
                 req.setLng(detail.getLng());
                 hadTrustedCoordinates = false;
             }
             req.setImageSource(detail.getImageSource() != null ? detail.getImageSource() : "CATEGORY_FALLBACK");
-            if (!hadTrustedCoordinates && detail.getDataSource() != null) {
+            if (!preserveApproximateCoordinates && !hadTrustedCoordinates && detail.getDataSource() != null) {
                 req.setDataSource(detail.getDataSource());
             }
             req.setOpeningHoursText(detail.getOpeningHours());
@@ -261,7 +268,7 @@ public class TripService {
             req.setHasOpeningHours(detail.getHasOpeningHours());
             req.setEnrichmentStatus(detail.getEnrichmentStatus());
             req.setHasRealPhoto(detail.getHasRealPhoto());
-            req.setPlaceDataRejectReason(detail.getRejectedReason());
+            if (!preserveApproximateCoordinates) req.setPlaceDataRejectReason(detail.getRejectedReason());
             if (req.getProviderTitle() == null) req.setProviderTitle(detail.getProviderTitle() != null ? detail.getProviderTitle() : detail.getName());
             if (req.getProviderId() == null) req.setProviderId(detail.getProviderId());
             if (req.getProviderSource() == null) req.setProviderSource(detail.getProviderSource() != null ? detail.getProviderSource() : detail.getDataSource());
@@ -482,6 +489,9 @@ public class TripService {
         stop.setLat(req.getLat());
         stop.setLng(req.getLng());
         stop.setImageUrl(req.getImageUrl());
+        stop.setPhotoUrls(req.getPhotoUrls() == null ? new java.util.ArrayList<>() : req.getPhotoUrls());
+        stop.setPhone(req.getPhone());
+        stop.setWebsite(req.getWebsite());
         stop.setRating(req.getRating());
         stop.setReviewCount(req.getReviewCount());
         stop.setImageSource(req.getImageSource());
@@ -576,6 +586,9 @@ public class TripService {
         if (detail.getImageUrl() != null && (stop.getImageUrl() == null || detailSerpImage || currentBadImage)) {
             stop.setImageUrl(detail.getImageUrl());
         }
+        if (detail.getPhotoUrls() != null && !detail.getPhotoUrls().isEmpty()) stop.setPhotoUrls(detail.getPhotoUrls());
+        if (stop.getPhone() == null) stop.setPhone(detail.getPhone());
+        if (stop.getWebsite() == null) stop.setWebsite(detail.getWebsite());
         if (isHotelLikeStop(stop) && hotelDisplayName(detail) != null) {
             stop.setName("Nhận phòng tại " + hotelDisplayName(detail));
             stop.setCategory("HOTEL");
@@ -894,6 +907,10 @@ public class TripService {
     private void enforceTripCoordinateTrust(AddStopRequest req, Trip trip) {
         if (Boolean.TRUE.equals(req.getSystemStop()) || isSystemStopCategory(req.getCategory())) return;
         req.setDataSource(canonicalDataSource(req.getDataSource()));
+        if ("APPROX".equals(req.getDataSource())) {
+            req.setHasRealCoordinates(false);
+            return;
+        }
         if (!hasValidCoordinate(req.getLat(), req.getLng())) {
             req.setHasRealCoordinates(false);
             req.setPlaceDataRejectReason("MISSING_COORDINATES");
@@ -922,6 +939,10 @@ public class TripService {
     private void enforceTripCoordinateTrust(TripStop stop, Trip trip) {
         if (isSystemStop(stop)) return;
         stop.setDataSource(canonicalDataSource(stop.getDataSource()));
+        if ("APPROX".equals(stop.getDataSource())) {
+            stop.setHasRealCoordinates(false);
+            return;
+        }
         if (!hasValidCoordinate(stop.getLat(), stop.getLng())) {
             stop.setHasRealCoordinates(false);
             stop.setPlaceDataRejectReason("MISSING_COORDINATES");
@@ -1390,6 +1411,9 @@ public class TripService {
             .completedAt(s.getCompletedAt())
             .lat(s.getLat()).lng(s.getLng())
             .imageUrl(s.getImageUrl())
+            .photoUrls(s.getPhotoUrls())
+            .phone(s.getPhone())
+            .website(s.getWebsite())
             .rating(s.getRating())
             .reviewCount(s.getReviewCount())
             .imageSource(s.getImageSource())

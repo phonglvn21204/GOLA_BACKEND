@@ -7,13 +7,12 @@ out/
 .idea/
 *.iml
 .env
-src/main/resources/firebase-service-account.json
 *.log
 target/
 __pycache__/
 .DS_Store
 ADMIN_CREDENTIALS.local.txt
-
+src/main/resources/firebase-service-account.json
 
 uploads/
 *.err

@@ -44,6 +44,7 @@ public class PostService {
     private final PostReactionRepository reactionRepo;
     private final SavedPostRepository savedPostRepo;
     private final NotificationService notificationService;
+    private final SupabaseStorageService supabaseStorageService;
 
     @Transactional
     public PostResponse createPost(UUID userId, CreatePostRequest req) {
@@ -113,9 +114,80 @@ public class PostService {
         if (!isAdmin && !post.getAuthorId().equals(userId)) {
             throw GolaException.forbidden();
         }
-        post.setHidden(true);
-        postRepo.save(post);
-        log.info("Post hidden by delete action: {} by user: {}", postId, userId);
+
+        log.info("Hard deleting post: postId={}, authorId={}, deletedBy={}, isAdmin={}", 
+                postId, post.getAuthorId(), userId, isAdmin);
+
+        // Delete media files from Supabase Storage
+        deletePostMediaFromSupabase(post);
+
+        // Delete all comments (cascades replies)
+        commentRepo.deleteByPostId(postId);
+        log.info("Deleted comments for post: postId={}", postId);
+
+        // Delete all reactions/likes
+        reactionRepo.deleteByPostId(postId);
+        log.info("Deleted reactions for post: postId={}", postId);
+
+        // Delete all saved posts/bookmarks
+        savedPostRepo.deleteByPostId(postId);
+        log.info("Deleted saved posts for post: postId={}", postId);
+
+        // Delete post hashtags
+        postHashtagRepo.deleteByPostId(postId);
+        log.info("Deleted hashtags for post: postId={}", postId);
+
+        // Delete the post itself
+        postRepo.deleteById(postId);
+        log.info("Hard deleted post from database: postId={}, authorId={}", postId, post.getAuthorId());
+    }
+
+    private void deletePostMediaFromSupabase(Post post) {
+        if (post == null) {
+            return;
+        }
+
+        deleteMediaUrls(post.getMediaUrls(), "mediaUrls");
+        deleteMediaUrls(post.getThumbnailUrls(), "thumbnailUrls");
+        deleteMediaUrls(post.getMediumUrls(), "mediumUrls");
+    }
+
+    private void deleteMediaUrls(String[] urls, String urlType) {
+        if (urls == null || urls.length == 0) {
+            return;
+        }
+
+        for (String url : urls) {
+            try {
+                String key = extractKeyFromSupabaseUrl(url);
+                if (key != null) {
+                    supabaseStorageService.deleteFile(key);
+                    log.debug("Deleted media file from Supabase: urlType={}, key={}", urlType, key);
+                }
+            } catch (Exception ex) {
+                log.warn("Failed to delete media file from Supabase: urlType={}, url={}, error={}", 
+                        urlType, url, ex.getMessage());
+            }
+        }
+    }
+
+    private String extractKeyFromSupabaseUrl(String supabaseUrl) {
+        if (supabaseUrl == null || !supabaseUrl.contains("/storage/v1/object/public/")) {
+            return null;
+        }
+        try {
+            String[] parts = supabaseUrl.split("/storage/v1/object/public/");
+            if (parts.length > 1) {
+                String pathWithBucket = parts[1];
+                String[] bucketAndPath = pathWithBucket.split("/", 2);
+                if (bucketAndPath.length > 1) {
+                    return java.net.URLDecoder.decode(bucketAndPath[1], java.nio.charset.StandardCharsets.UTF_8);
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("Failed to extract key from Supabase URL: url={}, error={}", supabaseUrl, ex.getMessage());
+        }
+        return null;
     }
 
     public PostResponse getPostById(UUID id) {

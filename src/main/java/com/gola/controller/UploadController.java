@@ -3,7 +3,7 @@ package com.gola.controller;
 import com.gola.dto.common.ApiResponse;
 import com.gola.exception.GolaException;
 import com.gola.security.SecurityUtils;
-import com.gola.service.R2StorageService;
+import com.gola.service.SupabaseStorageService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -51,7 +51,7 @@ import java.util.UUID;
 @Slf4j
 @RequiredArgsConstructor
 public class UploadController {
-    private final R2StorageService r2StorageService;
+    private final SupabaseStorageService supabaseStorageService;
     private static final long COMMUNITY_MEDIA_MAX_BYTES = 15L * 1024 * 1024;
     private static final String IMAGE_TOO_LARGE_MESSAGE = "Ảnh quá lớn. Vui lòng chọn ảnh nhỏ hơn 15MB.";
     private static final int THUMBNAIL_MAX_WIDTH = 480;
@@ -104,10 +104,10 @@ public class UploadController {
             Files.copy(file.getInputStream(), tempOriginal, StandardCopyOption.REPLACE_EXISTING);
 
             String key = "community-media/" + userId + "/" + fileName;
-            String publicUrl = r2StorageService.uploadFile(key, Files.newInputStream(tempOriginal), contentType, file.getSize());
+            String publicUrl = supabaseStorageService.uploadFile(key, Files.newInputStream(tempOriginal), contentType, file.getSize());
 
             MediaVariants variants = generateVariants(tempOriginal, userId, fileName);
-            log.info("Community media upload stored: userId={}, tripId={}, fileName={}, publicUrl={}",
+            log.info("Upload community image to Supabase: userId={}, tripId={}, fileName={}, publicUrl={}", 
                     userId, tripId, fileName, publicUrl);
             Map<String, String> response = new HashMap<>();
             response.put("publicUrl", publicUrl);
@@ -131,6 +131,11 @@ public class UploadController {
         }
     }
 
+    /**
+     * @deprecated Community media serving now uses Supabase Storage. This endpoint is maintained for backward compatibility only.
+     * New community media is served directly from the public Supabase URL.
+     */
+    @Deprecated(since = "1.0", forRemoval = false)
     @GetMapping("/community-media/{userId}/{fileName}")
     public ResponseEntity<Resource> communityMedia(@PathVariable String userId, @PathVariable String fileName) throws Exception {
         Path root = Path.of("uploads", "community-media").toAbsolutePath().normalize();
@@ -145,6 +150,11 @@ public class UploadController {
                 .body(new FileSystemResource(file));
     }
 
+    /**
+     * @deprecated Trip memory photos serving now uses Supabase Storage. This endpoint is maintained for backward compatibility only.
+     * New photos are served directly from the public Supabase URL.
+     */
+    @Deprecated(since = "1.0", forRemoval = false)
     @GetMapping("/trip-memory-photos/{tripId}/{fileName}")
     public ResponseEntity<Resource> tripMemoryPhoto(@PathVariable String tripId, @PathVariable String fileName) throws Exception {
         Path root = Path.of("uploads", "trip-memory-photos").toAbsolutePath().normalize();
@@ -159,6 +169,11 @@ public class UploadController {
                 .body(new FileSystemResource(file));
     }
 
+    /**
+     * @deprecated Avatar serving now uses Supabase Storage. This endpoint is maintained for backward compatibility only.
+     * New avatars are served directly from the public Supabase URL.
+     */
+    @Deprecated(since = "1.0", forRemoval = false)
     @GetMapping("/avatars/{userId}/{fileName}")
     public ResponseEntity<Resource> avatar(@PathVariable String userId, @PathVariable String fileName) throws Exception {
         Path root = Path.of("uploads", "avatars").toAbsolutePath().normalize();
@@ -206,8 +221,8 @@ public class UploadController {
             String thumbKey = "community-media/" + userId + "/" + baseName + "-thumb.jpg";
             String mediumKey = "community-media/" + userId + "/" + baseName + "-medium.jpg";
 
-            String thumbnailUrl = r2StorageService.uploadFile(thumbKey, Files.newInputStream(tempThumb), "image/jpeg", Files.size(tempThumb));
-            String mediumUrl = r2StorageService.uploadFile(mediumKey, Files.newInputStream(tempMedium), "image/jpeg", Files.size(tempMedium));
+            String thumbnailUrl = supabaseStorageService.uploadFile(thumbKey, Files.newInputStream(tempThumb), "image/jpeg", Files.size(tempThumb));
+            String mediumUrl = supabaseStorageService.uploadFile(mediumKey, Files.newInputStream(tempMedium), "image/jpeg", Files.size(tempMedium));
 
             return new MediaVariants(thumbnailUrl, mediumUrl);
         } catch (Exception ex) {

@@ -9,7 +9,7 @@ import com.gola.entity.enums.IncidentType;
 import com.gola.security.SecurityUtils;
 import com.gola.service.IncidentAiService;
 import com.gola.service.IncidentService;
-import com.gola.service.R2StorageService;
+import com.gola.service.SupabaseStorageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +36,7 @@ import java.util.UUID;
 public class TripIncidentController {
     private final IncidentService incidentService;
     private final IncidentAiService incidentAiService;
-    private final R2StorageService r2StorageService;
+    private final SupabaseStorageService supabaseStorageService;
 
     @GetMapping
     @Operation(summary = "Get incident history for a trip")
@@ -88,7 +88,7 @@ public class TripIncidentController {
         String extension = extensionFrom(photo.getOriginalFilename(), contentType);
         String fileName = "incident-" + UUID.randomUUID() + extension;
         String key = "community-media/" + userId + "/" + fileName;
-        return r2StorageService.uploadFile(key, photo.getInputStream(), contentType, photo.getSize());
+        return supabaseStorageService.uploadFile(key, photo.getInputStream(), contentType, photo.getSize());
     }
 
     private String extensionFrom(String originalName, String contentType) {

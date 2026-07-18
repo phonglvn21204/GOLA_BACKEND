@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Data
 @Builder
@@ -24,6 +25,7 @@ public class PlaceDetail {
     private Boolean wheelchair;    // hỗ trợ xe lăn
     private String imageUrl;       // URL ảnh từ Wikimedia
     private String wikidataId;     // để dùng sau nếu cần
+    private List<String> photoUrls;
     private BigDecimal rating;
     private Integer reviewCount;
     private String imageSource;
