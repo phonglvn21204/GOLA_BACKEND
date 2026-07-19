@@ -11,6 +11,7 @@ import com.gola.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,6 +48,7 @@ public class TripService {
     private final PlaceEnrichmentService placeEnrichmentService;
     private final PlaceService placeService;
     private final NotificationService notificationService;
+    private final BillingService billingService;
 
     @Transactional
     public TripResponse createTrip(UUID userId, CreateTripRequest req) {
@@ -1078,8 +1080,8 @@ public class TripService {
     @Transactional
     public TripResponse endTrip(UUID tripId, UUID userId) {
         Trip trip = tripRepo.findActiveById(tripId).orElseThrow(() -> GolaException.notFound("Trip"));
-        if (!memberRepo.existsByTripIdAndUserId(tripId, userId)) {
-            throw GolaException.forbidden();
+        if (!trip.getOwnerId().equals(userId)) {
+            throw new GolaException(HttpStatus.FORBIDDEN, "TRIP_OWNER_REQUIRED", "Only the trip creator can finish this trip");
         }
         if (trip.getStatus() == TripStatus.COMPLETED) {
             ensureTripMemory(trip, userId);
@@ -1289,6 +1291,9 @@ public class TripService {
         int questCompletedCount = (int) questProgressRepo.countByTripIdAndUserIdAndStatus(
                 t.getId(), memoryUserId, QuestProgressStatus.COMPLETED);
 
+        boolean isTripOwner = viewerId != null && viewerId.equals(t.getOwnerId());
+        boolean isPremiumUser = viewerId != null && billingService.hasActivePremium(viewerId);
+
         return TripResponse.builder()
             .id(t.getId()).ownerId(t.getOwnerId()).title(t.getTitle())
             .origin(t.getOrigin()).destination(t.getDestination())
@@ -1316,6 +1321,8 @@ public class TripService {
             .reelStatus(memory != null ? memory.getReelStatus() : "NOT_GENERATED")
             .qualityScore(t.getQualityScore())
             .qualityWarning(t.getQualityWarning())
+            .isTripOwner(isTripOwner)
+            .isPremiumUser(isPremiumUser)
             .build();
     }
 

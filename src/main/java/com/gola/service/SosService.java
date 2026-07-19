@@ -7,6 +7,7 @@ import com.gola.entity.enums.*;
 import com.gola.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -71,7 +72,7 @@ public class SosService {
     public void resolveSos(UUID sosId, UUID resolvedBy, String reason) {
         var sos = sosRepo.findById(sosId).orElseThrow(() -> GolaException.notFound("SOS event"));
         if (sos.getStatus() != SosStatus.ACTIVE && sos.getStatus() != SosStatus.ACKNOWLEDGED) {
-            throw GolaException.badRequest("SOS is not active");
+            throw new GolaException(HttpStatus.CONFLICT, "SOS_INACTIVE", "SOS is no longer active");
         }
         sos.setStatus("FALSE_ALARM".equals(reason) ? SosStatus.FALSE_ALARM : SosStatus.RESOLVED);
         sos.setResolvedAt(Instant.now());
@@ -79,13 +80,23 @@ public class SosService {
         sosRepo.save(sos);
         escalatedSosIds.remove(sosId);
         messaging.convertAndSend("/topic/sos/" + sosId, mapToResponse(sos));
+        
+        // Broadcast SOS_CANCELLED to trip members (excluding sender)
+        if (sos.getTripId() != null) {
+            messaging.convertAndSend("/topic/trip/" + sos.getTripId(), java.util.Map.of(
+                "event", "sos.cancelled",
+                "sosId", sos.getId().toString(),
+                "status", sos.getStatus().toString(),
+                "excludeUser", sos.getUserId().toString()
+            ));
+        }
     }
 
     @Transactional
     public SosResponse acknowledge(UUID sosId, UUID acknowledgerId) {
         var sos = sosRepo.findById(sosId).orElseThrow(() -> GolaException.notFound("SOS event"));
         if (sos.getStatus() != SosStatus.ACTIVE) {
-            throw GolaException.badRequest("Only ACTIVE SOS events can be acknowledged");
+            throw new GolaException(HttpStatus.CONFLICT, "SOS_INACTIVE", "SOS is no longer active");
         }
         sos.setStatus(SosStatus.ACKNOWLEDGED);
         sos.setAcknowledgedAt(Instant.now());
@@ -128,7 +139,12 @@ public class SosService {
     private void broadcastSos(SosEvent sos) {
         messaging.convertAndSend("/topic/admin/sos", mapToResponse(sos));
         if (sos.getTripId() != null) {
-            messaging.convertAndSend("/topic/trip/" + sos.getTripId(), java.util.Map.of("event","sos.created","sos", mapToResponse(sos)));
+            // Include excludeUser so WebSocket subscribers (frontend) can filter out the sender
+            messaging.convertAndSend("/topic/trip/" + sos.getTripId(), java.util.Map.of(
+                "event", "sos.created",
+                "sos", mapToResponse(sos),
+                "excludeUser", sos.getUserId().toString()
+            ));
         }
     }
 

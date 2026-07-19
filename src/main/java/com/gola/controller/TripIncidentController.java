@@ -6,7 +6,9 @@ import com.gola.dto.safety.IncidentRequest;
 import com.gola.dto.safety.IncidentResponse;
 import com.gola.entity.enums.IncidentSeverity;
 import com.gola.entity.enums.IncidentType;
+import com.gola.exception.GolaException;
 import com.gola.security.SecurityUtils;
+import com.gola.service.BillingService;
 import com.gola.service.IncidentAiService;
 import com.gola.service.IncidentService;
 import com.gola.service.SupabaseStorageService;
@@ -37,6 +39,7 @@ public class TripIncidentController {
     private final IncidentService incidentService;
     private final IncidentAiService incidentAiService;
     private final SupabaseStorageService supabaseStorageService;
+    private final BillingService billingService;
 
     @GetMapping
     @Operation(summary = "Get incident history for a trip")
@@ -59,6 +62,11 @@ public class TripIncidentController {
             @RequestParam(required = false) Double lng,
             @RequestParam(required = false) MultipartFile photo) throws IOException {
         UUID userId = SecurityUtils.getCurrentUserId();
+        
+        if (!billingService.hasActivePremium(userId)) {
+            throw new GolaException(HttpStatus.FORBIDDEN, "PREMIUM_REQUIRED", "This feature requires Premium.");
+        }
+        
         String photoUrl = photo != null && !photo.isEmpty() ? storeIncidentPhoto(userId, photo) : null;
         IncidentRequest request = new IncidentRequest();
         request.setTripId(tripId);

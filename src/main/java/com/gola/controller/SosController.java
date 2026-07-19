@@ -2,11 +2,14 @@ package com.gola.controller;
 
 import com.gola.dto.common.ApiResponse;
 import com.gola.dto.safety.*;
+import com.gola.exception.GolaException;
+import com.gola.service.BillingService;
 import com.gola.service.SosService;
 import com.gola.security.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,11 +22,18 @@ import java.util.List;
 @Tag(name = "SOS Emergency", description = "Trigger, resolve, and monitor SOS events")
 public class SosController {
     private final SosService sosService;
+    private final BillingService billingService;
 
     @PostMapping("/trigger")
     @Operation(summary = "Trigger SOS emergency")
     public ResponseEntity<ApiResponse<SosResponse>> trigger(@RequestBody SosTriggerRequest req) {
-        return ResponseEntity.ok(ApiResponse.ok("SOS triggered", sosService.triggerSos(SecurityUtils.getCurrentUserId(), req)));
+        UUID userId = SecurityUtils.getCurrentUserId();
+        
+        if (!billingService.hasActivePremium(userId)) {
+            throw new GolaException(HttpStatus.FORBIDDEN, "PREMIUM_REQUIRED", "This feature requires Premium.");
+        }
+        
+        return ResponseEntity.ok(ApiResponse.ok("SOS triggered", sosService.triggerSos(userId, req)));
     }
 
     @PostMapping("/{sosId}/resolve")

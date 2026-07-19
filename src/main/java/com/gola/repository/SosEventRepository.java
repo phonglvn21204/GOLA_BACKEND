@@ -13,4 +13,5 @@ import java.util.UUID;
     List<SosEvent> findByStatus(SosStatus status);
     List<SosEvent> findByStatusIn(List<SosStatus> statuses);
     List<SosEvent> findByStatusAndCreatedAtBefore(SosStatus status, Instant createdAt);
+    List<SosEvent> findByTripIdAndStatus(UUID tripId, SosStatus status);
 }

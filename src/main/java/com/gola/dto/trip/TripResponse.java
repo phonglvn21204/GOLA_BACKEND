@@ -43,4 +43,6 @@ public class TripResponse {
     private String reelStatus;
     private Integer qualityScore;
     private String qualityWarning;
+    private Boolean isTripOwner;
+    private Boolean isPremiumUser;
 }
