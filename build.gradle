@@ -102,6 +102,9 @@ dependencies {
     // AWS S3 SDK for Cloudflare R2 integration
     implementation 'software.amazon.awssdk:s3:2.25.15'
 
+    // SendGrid
+    implementation 'com.sendgrid:sendgrid-java:4.10.2'
+
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
